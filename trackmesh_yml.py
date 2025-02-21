@@ -1,5 +1,7 @@
 import sys
 import json
+import yaml
+import cv2
 import numpy as np
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
@@ -7,8 +9,13 @@ from PyQt5.QtGui import QColor, QOpenGLVersionProfile, QPixmap, QSurfaceFormat, 
 from PyQt5.QtWidgets import (QApplication, QWidget, QOpenGLWidget,
                              QHBoxLayout, QVBoxLayout, QPushButton, 
                              QFileDialog, QSlider, QSpinBox, QDoubleSpinBox,
-                             QGroupBox, QFormLayout, QLabel, QComboBox, QGraphicsView, QGraphicsScene)
+                             QGroupBox, QFormLayout, QLabel, QComboBox, QGraphicsView, QGraphicsScene, QLineEdit)
 from scipy.spatial.transform import Rotation as R
+from OpenGL.GL import *
+from OpenGL.GLUT import *
+from OpenGL.GLU import *
+
+
 class MyGLWidget(QOpenGLWidget):
     def __init__(self, parent=None):
         super(MyGLWidget, self).__init__(parent)
@@ -32,6 +39,9 @@ class MyGLWidget(QOpenGLWidget):
 
         # 背景图片
         self.background_image = None
+        #默认渲染视口大小
+        self.width_value = 1920  # 默认宽度
+        self.height_value = 1080 # 默认高度
 
     def set_mesh(self, vertices, faces):
         self.vertices = vertices
@@ -64,28 +74,29 @@ class MyGLWidget(QOpenGLWidget):
         self.gl.glEnable(self.gl.GL_DEPTH_TEST)
         self.gl.glDisable(self.gl.GL_LIGHTING)
         self.gl.glEnable(self.gl.GL_COLOR_MATERIAL)
-
+    #debug:resize只有在初始化以及窗口大小改变时才会调用；width, height似乎是窗口大小而非渲染视口大小
     def resizeGL(self, width, height):
-        # 设置视口为整个窗口区域
+        #print(width, height)
         self.gl.glViewport(0, 0, width, height)
         self.gl.glMatrixMode(self.gl.GL_PROJECTION)
         self.gl.glLoadIdentity()
 
         if self.camera_param is not None:
-            # 根据相机内参设置透视投影
-            n = 0.1
-            f = 1000.0
-            fx = self.camera_param['fx']
-            fy = self.camera_param['fy']
-            width_cam = self.camera_param['width']
-            height_cam = self.camera_param['height']
-            cx = width_cam / 2.0
-            cy = height_cam / 2.0
+            # 获取相机内参
+            K = np.array(self.camera_param['K'], dtype=np.float32).reshape((3, 3))
+            #fx水平焦距，fy垂直焦距，
+            #cx水平主点坐标（图像宽度的一半）和cy垂直主点坐标（图像高度的一半）
+            fx, fy = K[0, 0], K[1, 1]
+            cx, cy = K[0, 2], K[1, 2]
+            n=0.1
+            f=1000.0
+            # 设置透视投影矩阵
             left   = -cx * n / fx
-            right  = (width_cam - cx) * n / fx
-            bottom = -(height_cam - cy) * n / fy
+            right  = (self.width_value - cx) * n / fx
+            bottom = -(self.height_value - cy) * n / fy
             top    = cy * n / fy
             self.gl.glFrustum(left, right, bottom, top, n, f)
+
         else:
             side = min(width, height)
             if side < 0:
@@ -93,6 +104,44 @@ class MyGLWidget(QOpenGLWidget):
             self.gl.glOrtho(-1.5, 1.5, -1.5, 1.5, -10, 10)
 
         self.gl.glMatrixMode(self.gl.GL_MODELVIEW)
+
+    def draw_axes(self):
+        # 设置坐标轴的颜色和宽度
+        glLineWidth(2)
+        
+        # 绘制 X 轴 (红色)
+        glColor3f(1.0, 0.0, 0.0)  # 红色
+        glBegin(GL_LINES)
+        glVertex3f(0, 0, 0)
+        glVertex3f(1, 0, 0)  # X轴到(1, 0, 0)
+        glEnd()
+        
+        # 绘制 Y 轴 (绿色)
+        glColor3f(0.0, 1.0, 0.0)  # 绿色
+        glBegin(GL_LINES)
+        glVertex3f(0, 0, 0)
+        glVertex3f(0, 1, 0)  # Y轴到(0, 1, 0)
+        glEnd()
+
+        # 绘制 Z 轴 (蓝色)
+        glColor3f(0.0, 0.0, 1.0)  # 蓝色
+        glBegin(GL_LINES)
+        glVertex3f(0, 0, 0)
+        glVertex3f(0, 0, 1)  # Z轴到(0, 0, 1)
+        glEnd()
+
+
+
+    def draw_axes_with_camera(self):
+
+        #坐标轴旋转回到世界坐标轴,注意旋转顺序必须倒过来因为旋转操作没有交换性
+        self.gl.glRotatef(-self.rotation[2], 0, 0, 1)
+        self.gl.glRotatef(-self.rotation[1], 0, 1, 0)
+        self.gl.glRotatef(-self.rotation[0], 1, 0, 0)
+        self.gl.glScalef(0.5, 0.5, 0.5)  # 坐标轴的缩放（固定大小）
+
+        # 画坐标轴
+        self.draw_axes()
 
     def paintGL(self):
         # 清除颜色缓冲区和深度缓冲区
@@ -104,9 +153,11 @@ class MyGLWidget(QOpenGLWidget):
             self.draw_background()
 
         if self.camera_param is not None:
+            #print('设置外参')
             # 使用相机外参构建视图矩阵
-            R = np.array(self.camera_param['rotation'], dtype=np.float32)
-            t = np.array(self.camera_param['position'], dtype=np.float32)
+            #print(self.camera_param)
+            R = np.array(self.camera_param['R'], dtype=np.float32).reshape((3, 3))
+            t = np.array(self.camera_param['T'], dtype=np.float32)
             R_T = R.T
             t_new = -np.dot(R_T, t)
             view_matrix = np.eye(4, dtype=np.float32)
@@ -114,6 +165,21 @@ class MyGLWidget(QOpenGLWidget):
             view_matrix[:3, 3] = t_new
             matrix = view_matrix.T.flatten().astype(np.float32).tolist()
             self.gl.glLoadMatrixf(matrix)
+
+            # 获取相机内参
+            K = np.array(self.camera_param['K'], dtype=np.float32).reshape((3, 3))
+            #fx水平焦距，fy垂直焦距，
+            #cx水平主点坐标（图像宽度的一半）和cy垂直主点坐标（图像高度的一半）
+            fx, fy = K[0, 0], K[1, 1]
+            cx, cy = K[0, 2], K[1, 2]
+            n=0.1
+            f=1000.0
+            # 设置透视投影矩阵
+            left   = -cx * n / fx
+            right  = (self.width_value - cx) * n / fx
+            bottom = -(self.height_value - cy) * n / fy
+            top    = cy * n / fy
+            self.gl.glFrustum(left, right, bottom, top, n, f)
 
         # 使用共享变换参数（平移 -> 旋转 -> 缩放）
         self.gl.glTranslatef(*self.translation)
@@ -139,6 +205,8 @@ class MyGLWidget(QOpenGLWidget):
                     self.gl.glVertex3fv(vertex[0:3])
             self.gl.glEnd()
 
+        # 绘制坐标轴
+        self.draw_axes_with_camera()        
         # 禁用混合
         self.gl.glDisable(self.gl.GL_BLEND)
 
@@ -165,6 +233,12 @@ class MyGLWidget(QOpenGLWidget):
         if y is not None: self.scale[1] = y
         if z is not None: self.scale[2] = z
         self.update()
+
+    def set_height(self, height):
+        self.height_value = height
+    
+    def set_weight(self, weight):
+        self.width_value = weight
 
 class MeshViewer(QWidget):
     def __init__(self):
@@ -221,9 +295,37 @@ class MeshViewer(QWidget):
         layout.addWidget(btnOpen)
 
         # 相机参数文件加载按钮
-        btnLoadCamera = QPushButton("Load Camera JSON")
-        btnLoadCamera.clicked.connect(self.openCameraJSON)
+        btnLoadCamera = QPushButton("Select Camera Extriyml")
+        btnLoadCamera.clicked.connect(self.openCameraEXTRIYML)
         layout.addWidget(btnLoadCamera)
+
+        btnLoadCamera = QPushButton("Select Camera Intriyml")
+        btnLoadCamera.clicked.connect(self.openCameraINRIYML)
+        layout.addWidget(btnLoadCamera)
+
+        btnLoadCamera = QPushButton("Load Camera Parameters")
+        btnLoadCamera.clicked.connect(self.load_camera_parameters)
+        layout.addWidget(btnLoadCamera)
+
+        # 创建标签和输入框
+        self.weight_label = QLabel('Weight:')
+        self.weight_input = QLineEdit()
+        self.weight_input.setPlaceholderText('Enter your weight')
+
+        self.height_label = QLabel('Height:')
+        self.height_input = QLineEdit()
+        self.height_input.setPlaceholderText('Enter your height')
+
+        # 创建提交按钮
+        self.submit_button = QPushButton('Submit weight and height（only active after loading camera params）')
+        self.submit_button.clicked.connect(self.on_submit)
+
+        # 将控件添加到布局中
+        layout.addWidget(self.weight_label)
+        layout.addWidget(self.weight_input)
+        layout.addWidget(self.height_label)
+        layout.addWidget(self.height_input)
+        layout.addWidget(self.submit_button)
 
         # 本地图片加载按钮
         btnLoadImage1 = QPushButton("Load Background Image 1")
@@ -291,12 +393,31 @@ class MeshViewer(QWidget):
         self.exportButton.clicked.connect(self.export_parameters)
         layout.addWidget(self.exportButton)
 
-
         layout.addStretch()
-
         panel.setLayout(layout)
         return panel
 
+    def on_submit(self):
+        weight = int(self.weight_input.text())
+        height = int(self.height_input.text())
+        self.glWidget1.set_weight(weight)
+        self.glWidget1.set_height(height)
+        self.glWidget2.set_weight(weight)
+        self.glWidget2.set_height(height)
+        self.glWidget3.set_weight(weight)
+        self.glWidget3.set_height(height)
+        self.glWidget4.set_weight(weight)
+        self.glWidget4.set_height(height)
+        self.glWidget5.set_weight(weight)
+        self.glWidget5.set_height(height)
+        self.glWidget6.set_weight(weight)
+        self.glWidget6.set_height(height)
+        self.glWidget1.update()
+        self.glWidget2.update()
+        self.glWidget3.update()
+        self.glWidget4.update()
+        self.glWidget5.update()
+        self.glWidget6.update()
 
     def export_parameters(self):
         # 获取旋转、平移和缩放参数
@@ -333,34 +454,34 @@ class MeshViewer(QWidget):
     def get_scale(self):
         # 返回当前缩放因子
         return self.scaleXSpin.value()
-
+    #TODO:修改ui变化条
     def createTranslationControls(self):
         group = QGroupBox("Translation Controls")
         form = QFormLayout()
 
         # X 平移
         self.transXSpin = QDoubleSpinBox()
-        self.transXSpin.setRange(-10.0, 10.0)
+        self.transXSpin.setRange(-30.0, 30.0)
         self.transXSpin.setSingleStep(0.1)
         self.transXSpin.setValue(0.0)
         self.transXSpin.valueChanged.connect(self.translationChanged)
-        form.addRow("X Translation", self.transXSpin)
+        form.addRow("X(red axis) Translation", self.transXSpin)
 
         # Y 平移
         self.transYSpin = QDoubleSpinBox()
-        self.transYSpin.setRange(-10.0, 10.0)
+        self.transYSpin.setRange(-30.0, 30.0)
         self.transYSpin.setSingleStep(0.1)
         self.transYSpin.setValue(0.0)
         self.transYSpin.valueChanged.connect(self.translationChanged)
-        form.addRow("Y Translation", self.transYSpin)
+        form.addRow("Y(green axis) Translation", self.transYSpin)
 
         # Z 平移
         self.transZSpin = QDoubleSpinBox()
-        self.transZSpin.setRange(-10.0, 10.0)
+        self.transZSpin.setRange(-30.0, 30.0)
         self.transZSpin.setSingleStep(0.1)
         self.transZSpin.setValue(0.0)
         self.transZSpin.valueChanged.connect(self.translationChanged)
-        form.addRow("Z Translation", self.transZSpin)
+        form.addRow("Z(blue axis) Translation", self.transZSpin)
 
         group.setLayout(form)
         return group
@@ -372,26 +493,26 @@ class MeshViewer(QWidget):
         # X 旋转
         self.rotXSpin = QDoubleSpinBox()
         self.rotXSpin.setRange(-180.0, 180.0)
-        self.rotXSpin.setSingleStep(1.0)
+        self.rotXSpin.setSingleStep(5.0)
         self.rotXSpin.setValue(0)
         self.rotXSpin.valueChanged.connect(self.rotationChanged)
-        form.addRow("X Rotation", self.rotXSpin)
+        form.addRow("X(red axis) Rotation", self.rotXSpin)
 
         # Y 旋转
         self.rotYSpin = QDoubleSpinBox()
         self.rotYSpin.setRange(-180.0, 180.0)
-        self.rotYSpin.setSingleStep(1.0)
+        self.rotYSpin.setSingleStep(5.0)
         self.rotYSpin.setValue(0)
         self.rotYSpin.valueChanged.connect(self.rotationChanged)
-        form.addRow("Y Rotation", self.rotYSpin)
+        form.addRow("Y(green axis) Rotation", self.rotYSpin)
 
         # Z 旋转
         self.rotZSpin = QDoubleSpinBox()
         self.rotZSpin.setRange(-180.0, 180.0)
-        self.rotZSpin.setSingleStep(1.0)
+        self.rotZSpin.setSingleStep(5.0)
         self.rotZSpin.setValue(0.0)
         self.rotZSpin.valueChanged.connect(self.rotationChanged)
-        form.addRow("Z Rotation", self.rotZSpin)
+        form.addRow("Z(blue axis) Rotation", self.rotZSpin)
 
         group.setLayout(form)
         return group
@@ -402,8 +523,8 @@ class MeshViewer(QWidget):
 
         # 缩放
         self.scaleXSpin = QDoubleSpinBox()
-        self.scaleXSpin.setRange(0.1, 10.0)
-        self.scaleXSpin.setSingleStep(0.1)
+        self.scaleXSpin.setRange(0.01, 20.01)
+        self.scaleXSpin.setSingleStep(0.2)
         self.scaleXSpin.setValue(1.0)
         self.scaleXSpin.valueChanged.connect(self.scaleChanged)
         form.addRow("Scale", self.scaleXSpin)
@@ -424,19 +545,80 @@ class MeshViewer(QWidget):
             self.glWidget4.set_mesh(vertices, faces)
             self.glWidget5.set_mesh(vertices, faces)
             self.glWidget6.set_mesh(vertices, faces)
+ 
+    #TODO
+    def read_intrinsics(self, yaml_path):
+    # 打开YAML文件
+        fs = cv2.FileStorage(yaml_path, cv2.FILE_STORAGE_READ)
+        
+        # 读取所有name
+        names_node = fs.getNode("names")
+        names = []
+        for i in range(names_node.size()):
+            names.append(int(names_node.at(i).string()))
 
-    def openCameraJSON(self):
-        filename, _ = QFileDialog.getOpenFileName(self, "Open Camera JSON", "", "JSON Files (*.json)")
-        if not filename:
+        # 为每个name读取对应参数
+        params_dict = {}
+        for name in names:
+            entry = {
+                "K":fs.getNode(f"K_{name}").mat().reshape((3, 3)),
+                "dist":fs.getNode(f"dist_{name}").mat().flatten()
+            }
+            params_dict[name] = entry      
+        fs.release()  
+        #print(params_dict)     
+        return params_dict
+
+    def read_extrinsics(self, yaml_path):
+    # 打开YAML文件
+        fs = cv2.FileStorage(yaml_path, cv2.FILE_STORAGE_READ)
+        
+        # 读取所有name
+        names_node = fs.getNode("names")
+        names = []
+        for i in range(names_node.size()):
+            names.append(int(names_node.at(i).string()))
+
+        # 为每个name读取对应参数
+        params_dict = {}
+        for name in names:
+            entry = {
+                "R": fs.getNode(f"Rot_{name}").mat(),
+                "T": fs.getNode(f"T_{name}").mat().flatten()
+            }
+            params_dict[name] = entry      
+        fs.release()   
+        #print(params_dict)    
+        return params_dict
+
+    def load_camera_parameters(self):
+        intrinsics = self.read_intrinsics(self.intri_filename)
+        extrinsics = self.read_extrinsics(self.extri_filename)
+        camera_params = []
+        #TODO:检查重合name
+        for name in intrinsics:
+            if name in extrinsics:
+                camera_params.append({"id":name,**intrinsics[name], **extrinsics.get(name, {})})
+        #print(camera_params)
+        self.camera_params = camera_params if isinstance(camera_params, list) else [camera_params]
+        self.updateCameraCombos()
+
+
+
+    def openCameraINRIYML(self):
+        intri_filename, _ = QFileDialog.getOpenFileName(self, "Open Intrinsics YAML", "", "YAML Files (*.yml)")
+        if not intri_filename:
             return
+        else:
+            self.intri_filename = intri_filename
 
-        try:
-            with open(filename, 'r') as f:
-                data = json.load(f)
-            self.camera_params = data if isinstance(data, list) else [data]
-            self.updateCameraCombos()
-        except Exception as e:
-            print(f"Error reading camera JSON file: {e}")
+    def openCameraEXTRIYML(self):
+        extri_filename, _ = QFileDialog.getOpenFileName(self, "Open Extrinsics YAML", "", "YAML Files (*.yml)")
+        if not extri_filename:
+            return
+        else:
+            self.extri_filename = extri_filename
+
 
     def loadBackgroundImage1(self):
         """加载背景图片"""
@@ -491,7 +673,7 @@ class MeshViewer(QWidget):
 
         # 为每个 OpenGL 部件设置背景图片
         self.glWidget6.set_background_image(filename)
-
+#TODO
     def updateCameraCombos(self):
         self.cameraCombo1.clear()
         self.cameraCombo2.clear()
@@ -500,7 +682,7 @@ class MeshViewer(QWidget):
         self.cameraCombo5.clear()
         self.cameraCombo6.clear()
         for cam in self.camera_params:
-            text = f"ID {cam.get('id', '')}: {cam.get('img_name', '')}"
+            text = f"ID {cam.get('id', '')}"
             self.cameraCombo1.addItem(text, cam)
             self.cameraCombo2.addItem(text, cam)
             self.cameraCombo3.addItem(text, cam)
