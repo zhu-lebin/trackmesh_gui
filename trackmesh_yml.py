@@ -1,6 +1,7 @@
 import sys
 import json
 import yaml
+import math
 import cv2
 import numpy as np
 from PyQt5 import QtCore, QtGui, QtWidgets
@@ -14,7 +15,7 @@ from scipy.spatial.transform import Rotation as R
 from OpenGL.GL import *
 from OpenGL.GLUT import *
 from OpenGL.GLU import *
-
+#TODO检查导出参数
 
 class MyGLWidget(QOpenGLWidget):
     def __init__(self, parent=None):
@@ -82,26 +83,52 @@ class MyGLWidget(QOpenGLWidget):
         self.gl.glLoadIdentity()
 
         if self.camera_param is not None:
-            # 获取相机内参
             K = np.array(self.camera_param['K'], dtype=np.float32).reshape((3, 3))
             #fx水平焦距，fy垂直焦距，
             #cx水平主点坐标（图像宽度的一半）和cy垂直主点坐标（图像高度的一半）
             fx, fy = K[0, 0], K[1, 1]
             cx, cy = K[0, 2], K[1, 2]
             n=0.1
-            f=1000.0
-            # 设置透视投影矩阵
-            left   = -cx * n / fx
-            right  = (self.width_value - cx) * n / fx
-            bottom = -(self.height_value - cy) * n / fy
-            top    = cy * n / fy
-            self.gl.glFrustum(left, right, bottom, top, n, f)
+            f=100
+            w=self.width_value
+            h=self.height_value
+            left = -cx * n / fx
+            right = (w - cx) * n / fx
+            bottom = -(h - cy) * n / fy
+            top = cy * n / fy
+            # 确保top > bottom
+            top, bottom = max(top, bottom), min(top, bottom)
+
+            # 计算投影矩阵参数
+            rl = right - left
+            tb = top - bottom
+
+            # 构建投影矩阵（行主序）
+            proj_matrix = np.array([
+                [2*n/rl, 0,        (right + left)/rl, 0],
+                [0,      2*n/tb,  (top + bottom)/tb,  0],
+                [0,      0,       -(f + n)/(f - n),  -2*f*n/(f - n)],
+                [0,      0,       -1,                0]
+            ], dtype=np.float32)
+            # 构建投影矩阵（行主序），无穷远投影
+            # proj_matrix = np.array([
+            #     [2*n/rl, 0,        (right + left)/rl, 0],
+            #     [0,      2*n/tb,  (top + bottom)/tb,  0],
+            #     [0,      0,       -1,  -2*n],
+            #     [0,      0,       -1,                0]
+            # ], dtype=np.float32)
+
+            self.gl.glMatrixMode(GL_PROJECTION)  # 切换到投影矩阵模式
+            self.gl.glLoadIdentity()
+            #注意列主序存储
+            self.gl.glLoadMatrixf(proj_matrix.T.flatten().astype(np.float32).tolist())
+            self.gl.glMatrixMode(GL_MODELVIEW)   # 切换到模型视图矩阵模式
 
         else:
             side = min(width, height)
             if side < 0:
                 return
-            self.gl.glOrtho(-1.5, 1.5, -1.5, 1.5, -10, 10)
+            self.gl.glOrtho(-4, 4, -4, 4, -10, 10)
 
         self.gl.glMatrixMode(self.gl.GL_MODELVIEW)
 
@@ -138,10 +165,12 @@ class MyGLWidget(QOpenGLWidget):
         self.gl.glRotatef(-self.rotation[2], 0, 0, 1)
         self.gl.glRotatef(-self.rotation[1], 0, 1, 0)
         self.gl.glRotatef(-self.rotation[0], 1, 0, 0)
+        #平移回原点     
+        #self.gl.glTranslatef(-self.translation[0], -self.translation[1], -self.translation[2])
         self.gl.glScalef(0.5, 0.5, 0.5)  # 坐标轴的缩放（固定大小）
-
         # 画坐标轴
         self.draw_axes()
+
 
     def paintGL(self):
         # 清除颜色缓冲区和深度缓冲区
@@ -153,19 +182,6 @@ class MyGLWidget(QOpenGLWidget):
             self.draw_background()
 
         if self.camera_param is not None:
-            #print('设置外参')
-            # 使用相机外参构建视图矩阵
-            #print(self.camera_param)
-            R = np.array(self.camera_param['R'], dtype=np.float32).reshape((3, 3))
-            t = np.array(self.camera_param['T'], dtype=np.float32)
-            R_T = R.T
-            t_new = -np.dot(R_T, t)
-            view_matrix = np.eye(4, dtype=np.float32)
-            view_matrix[:3, :3] = R_T
-            view_matrix[:3, 3] = t_new
-            matrix = view_matrix.T.flatten().astype(np.float32).tolist()
-            self.gl.glLoadMatrixf(matrix)
-
             # 获取相机内参
             K = np.array(self.camera_param['K'], dtype=np.float32).reshape((3, 3))
             #fx水平焦距，fy垂直焦距，
@@ -173,13 +189,61 @@ class MyGLWidget(QOpenGLWidget):
             fx, fy = K[0, 0], K[1, 1]
             cx, cy = K[0, 2], K[1, 2]
             n=0.1
-            f=1000.0
-            # 设置透视投影矩阵
-            left   = -cx * n / fx
-            right  = (self.width_value - cx) * n / fx
-            bottom = -(self.height_value - cy) * n / fy
-            top    = cy * n / fy
-            self.gl.glFrustum(left, right, bottom, top, n, f)
+            f=100
+            w=self.width_value
+            h=self.height_value
+            left = -cx * n / fx
+            right = (w - cx) * n / fx
+            bottom = -(h - cy) * n / fy
+            top = cy * n / fy
+            # 确保top > bottom
+            top, bottom = max(top, bottom), min(top, bottom)
+
+            # 计算投影矩阵参数
+            rl = right - left
+            tb = top - bottom
+
+            # 构建投影矩阵（行主序）
+            proj_matrix = np.array([
+                [2*n/rl, 0,        (right + left)/rl, 0],
+                [0,      2*n/tb,  (top + bottom)/tb,  0],
+                [0,      0,       -(f + n)/(f - n),  -2*f*n/(f - n)],
+                [0,      0,       -1,                0]
+            ], dtype=np.float32)
+            # 构建投影矩阵（行主序），无穷远投影
+            # proj_matrix = np.array([
+            #     [2*n/rl, 0,        (right + left)/rl, 0],
+            #     [0,      2*n/tb,  (top + bottom)/tb,  0],
+            #     [0,      0,       -1,  -2*n],
+            #     [0,      0,       -1,                0]
+            # ], dtype=np.float32)
+
+            self.gl.glMatrixMode(GL_PROJECTION)  # 切换到投影矩阵模式
+            self.gl.glLoadIdentity()
+            #注意列主序存储
+            self.gl.glLoadMatrixf(proj_matrix.T.flatten().astype(np.float32).tolist())
+            self.gl.glMatrixMode(GL_MODELVIEW)   # 切换到模型视图矩阵模式
+            
+            #print('设置外参')
+            # 使用相机外参构建视图矩阵
+            #print(self.camera_param)
+            #先旋转到opencv使用的默认相机视角
+            C =    np.array([
+                    [1,  0,  0],
+                    [0, -1,  0],
+                    [0,  0, -1]
+                ], dtype=np.float32)
+            R = np.array(self.camera_param['R'], dtype=np.float32).reshape((3, 3))
+            #print(R)
+            t = np.array(self.camera_param['T'], dtype=np.float32)
+            R = np.dot(C,R)
+            t = np.array([t[0],-t[1],-t[2]])
+            view_matrix = np.eye(4, dtype=np.float32)
+            view_matrix[:3, :3] = R
+            view_matrix[:3, 3] = t
+            #由于opengl列存储所以必须加转置
+            matrix = view_matrix.T.flatten().astype(np.float32).tolist()
+            self.gl.glLoadMatrixf(matrix)
 
         # 使用共享变换参数（平移 -> 旋转 -> 缩放）
         self.gl.glTranslatef(*self.translation)
@@ -191,7 +255,7 @@ class MyGLWidget(QOpenGLWidget):
         # 启用混合以实现透明效果
         self.gl.glEnable(self.gl.GL_BLEND)
         self.gl.glBlendFunc(self.gl.GL_SRC_ALPHA, self.gl.GL_ONE_MINUS_SRC_ALPHA)
-
+#TODO:半透明效果可能得改
         # 绘制网格
         if self.vertices and self.faces:
             self.gl.glBegin(self.gl.GL_TRIANGLES)
@@ -213,7 +277,26 @@ class MyGLWidget(QOpenGLWidget):
     def draw_background(self):
         """绘制背景图片"""
         painter = QPainter(self)
-        painter.drawImage(self.rect(), self.background_image)
+        if self.camera_param is not None:
+            # 获取相机内参
+            K = np.array(self.camera_param['K'], dtype=np.float32).reshape((3, 3))
+            distCoeffs = np.array(self.camera_param['dist'], dtype=np.float32)
+
+            width = self.background_image.width()
+            height = self.background_image.height()
+            ptr = self.background_image.bits()
+            ptr.setsize(self.background_image.byteCount())
+            arr = np.array(ptr).reshape(height, width, 4)  # 4 表示 RGBA 格式
+            arr = arr[..., :3]  # 只取 RGB 通道
+            image = cv2.undistort(arr, K, distCoeffs)
+            image = np.uint8(np.clip(image, 0, 255))
+            # 转换为 RGB 格式 OpenCV 默认使用 BGR 格式存储图像，而 Qt 中的 QImage 默认使用 RGB 格式
+            image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            # 转换去畸变后的 NumPy 数组为 QImage
+            corrected_image = QImage(image_rgb.data, width, height, QImage.Format_RGB888)
+            painter.drawImage(self.rect(), corrected_image)
+        else:
+            painter.drawImage(self.rect(), self.background_image)
         painter.end()
 
     def set_rotation(self, x=None, y=None, z=None):
@@ -533,20 +616,24 @@ class MeshViewer(QWidget):
         return group
 
     def openOBJ(self):
-        filename, _ = QFileDialog.getOpenFileName(self, "Open OBJ File", "", "OBJ Files (*.obj)")
+        filename, _ = QFileDialog.getOpenFileName(self, "Open OBJ File", "", "OBJ Files (*.obj);;All Files (*)")
         if not filename:
             return
 
-        vertices, faces = self.parseOBJ(filename)
-        if vertices and faces:
-            self.glWidget1.set_mesh(vertices, faces)
-            self.glWidget2.set_mesh(vertices, faces)
-            self.glWidget3.set_mesh(vertices, faces)
-            self.glWidget4.set_mesh(vertices, faces)
-            self.glWidget5.set_mesh(vertices, faces)
-            self.glWidget6.set_mesh(vertices, faces)
+        try:
+            vertices, faces, _, _, _ = self.parseOBJ(filename)
+            if vertices and faces:
+                # 打印 vertices 和 faces 的大小
+                print(f"Number of vertices: {len(vertices)}")
+                print(f"Number of faces: {len(faces)}")
+                
+                # 更新所有的 OpenGL 小部件
+                for widget in [self.glWidget1, self.glWidget2, self.glWidget3, self.glWidget4, self.glWidget5, self.glWidget6]:
+                    widget.set_mesh(vertices, faces)
+        except Exception as e:
+            print(f"Error loading OBJ file: {e}")
+
  
-    #TODO
     def read_intrinsics(self, yaml_path):
     # 打开YAML文件
         fs = cv2.FileStorage(yaml_path, cv2.FILE_STORAGE_READ)
@@ -583,6 +670,7 @@ class MeshViewer(QWidget):
         params_dict = {}
         for name in names:
             entry = {
+                "R_rec":fs.getNode(f"R_{name}").mat().flatten(),
                 "R": fs.getNode(f"Rot_{name}").mat(),
                 "T": fs.getNode(f"T_{name}").mat().flatten()
             }
@@ -595,7 +683,6 @@ class MeshViewer(QWidget):
         intrinsics = self.read_intrinsics(self.intri_filename)
         extrinsics = self.read_extrinsics(self.extri_filename)
         camera_params = []
-        #TODO:检查重合name
         for name in intrinsics:
             if name in extrinsics:
                 camera_params.append({"id":name,**intrinsics[name], **extrinsics.get(name, {})})
@@ -673,7 +760,7 @@ class MeshViewer(QWidget):
 
         # 为每个 OpenGL 部件设置背景图片
         self.glWidget6.set_background_image(filename)
-#TODO
+
     def updateCameraCombos(self):
         self.cameraCombo1.clear()
         self.cameraCombo2.clear()
@@ -749,31 +836,141 @@ class MeshViewer(QWidget):
         self.glWidget4.set_scale(self.scaleXSpin.value(), self.scaleXSpin.value(), self.scaleXSpin.value())
         self.glWidget5.set_scale(self.scaleXSpin.value(), self.scaleXSpin.value(), self.scaleXSpin.value())
         self.glWidget6.set_scale(self.scaleXSpin.value(), self.scaleXSpin.value(), self.scaleXSpin.value())
+    # def parseOBJ(self, filename):
+    #     vertices = []
+    #     faces = []
+    #     try:
+    #         with open(filename, 'r') as f:
+    #             for line in f:
+    #                 parts = line.strip().split()
+    #                 if not parts:
+    #                     continue
+                    
+    #                 if parts[0] == 'v' and len(parts) >= 7:
+    #                     coords = list(map(float, parts[1:7]))
+    #                     if any(c > 1.0 for c in coords[3:6]):
+    #                         coords[3:6] = [c/255.0 for c in coords[3:6]]
+    #                     vertices.append(coords)
+    #                 elif parts[0] == 'f':
+    #                     face = []
+    #                     for v in parts[1:4]:
+    #                         index = int(v.split('/')[0]) - 1
+    #                         face.append(index)
+    #                     faces.append(face)
+    #         return vertices, faces
+    #     except Exception as e:
+    #         print(f"Error reading OBJ file: {e}")
+    #         return [], []
+    
     def parseOBJ(self, filename):
         vertices = []
         faces = []
+        normals = []
+        textures = []
+        materials = None
+        current_material = None
+        
         try:
             with open(filename, 'r') as f:
-                for line in f:
-                    parts = line.strip().split()
-                    if not parts:
-                        continue
-                    
-                    if parts[0] == 'v' and len(parts) >= 7:
+                lines = f.readlines()
+
+            for line in lines:
+                parts = line.strip().split()
+
+                if not parts:
+                    continue
+
+                # 解析顶点 v [x, y, z, r, g, b] 或 v [x, y, z]
+                if parts[0] == 'v':
+                    if len(parts) == 4:  # 仅包含 x, y, z 坐标
+                        coords = list(map(float, parts[1:4]))
+                        
+                        if current_material and materials and current_material in materials:
+                            material_color = materials[current_material].get('Kd', [1.0, 1.0, 1.0])  # 默认白色
+                            coords.extend(material_color)  # 添加材质的颜色信息
+                        else:
+                            coords.extend([1.0, 1.0, 1.0])  # 默认白色
+                        vertices.append(coords)
+                    elif len(parts) == 7:  # 颜色包含 r, g, b
                         coords = list(map(float, parts[1:7]))
+                        # 如果颜色超过 [1, 1, 1] 需要归一化
                         if any(c > 1.0 for c in coords[3:6]):
                             coords[3:6] = [c/255.0 for c in coords[3:6]]
                         vertices.append(coords)
-                    elif parts[0] == 'f':
-                        face = []
-                        for v in parts[1:4]:
-                            index = int(v.split('/')[0]) - 1
-                            face.append(index)
-                        faces.append(face)
-            return vertices, faces
+
+                # 解析法向量 vn [x, y, z]
+                elif parts[0] == 'vn':
+                    normals.append(list(map(float, parts[1:4])))
+
+                # 解析纹理坐标 vt [u, v]
+                elif parts[0] == 'vt':
+                    textures.append(list(map(float, parts[1:3])))
+
+                # 解析面 f [v1/vt1/vn1, v2/vt2/vn2, v3/vt3/vn3]
+                elif parts[0] == 'f':
+                    face = []
+                    for v in parts[1:]:
+                        vertex_data = v.split('/')
+                        vertex_indices = int(vertex_data[0]) - 1  # 顶点索引
+                        face.append(vertex_indices)
+                    faces.append(face)
+
+                # 解析材质库 mtllib filename.mtl
+                elif parts[0] == 'mtllib':
+                    # 获取obj文件所在的目录
+                    obj_dir = os.path.dirname(os.path.abspath(filename))
+                    mtl_filename = parts[1]
+                    mtl_filepath = os.path.join(obj_dir, mtl_filename)                   
+                    materials = self.parseMTL(mtl_filepath)
+
+                # 解析使用材质 usemtl material_name
+                elif parts[0] == 'usemtl':
+                    current_material = parts[1]
+
+            return vertices, faces, normals, textures, materials
         except Exception as e:
             print(f"Error reading OBJ file: {e}")
-            return [], []
+            return [], [], [], [], []
+
+    def parseMTL(self, filename):
+        materials = {}
+        current_material = None
+
+        try:
+            with open(filename, 'r') as f:
+                lines = f.readlines()
+
+            for line in lines:
+                parts = line.strip().split()
+
+                if not parts:
+                    continue
+
+                # 解析材质名 newmtl material_name
+                if parts[0] == 'newmtl':
+                    current_material = parts[1]
+                    materials[current_material] = {}
+
+                # 解析漫反射颜色 Kd
+                elif parts[0] == 'Kd':
+                    materials[current_material]['Kd'] = list(map(float, parts[1:4]))
+
+                # 解析环境光颜色 Ka
+                elif parts[0] == 'Ka':
+                    materials[current_material]['Ka'] = list(map(float, parts[1:4]))
+
+                # 解析镜面反射颜色 Ks
+                elif parts[0] == 'Ks':
+                    materials[current_material]['Ks'] = list(map(float, parts[1:4]))
+
+                # 解析纹理图像 map_Kd
+                elif parts[0] == 'map_Kd':
+                    materials[current_material]['map_Kd'] = parts[1]
+
+            return materials
+        except Exception as e:
+            print(f"Error reading MTL file: {e}")
+            return {}
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
