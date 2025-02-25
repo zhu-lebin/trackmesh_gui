@@ -43,6 +43,7 @@ class MyGLWidget(QOpenGLWidget):
         #默认渲染视口大小
         self.width_value = 1920  # 默认宽度
         self.height_value = 1080 # 默认高度
+        self.distortion_enabled = False  # 默认不启用去畸变
 
     def set_mesh(self, vertices, faces):
         self.vertices = vertices
@@ -277,7 +278,7 @@ class MyGLWidget(QOpenGLWidget):
     def draw_background(self):
         """绘制背景图片"""
         painter = QPainter(self)
-        if self.camera_param is not None:
+        if self.camera_param is not None and self.distortion_enabled:
             # 获取相机内参
             K = np.array(self.camera_param['K'], dtype=np.float32).reshape((3, 3))
             distCoeffs = np.array(self.camera_param['dist'], dtype=np.float32)
@@ -299,6 +300,11 @@ class MyGLWidget(QOpenGLWidget):
             painter.drawImage(self.rect(), self.background_image)
         painter.end()
 
+
+    def set_distortion_enabled(self, enabled):
+        self.distortion_enabled = enabled
+        self.update()
+ 
     def set_rotation(self, x=None, y=None, z=None):
         if x is not None: self.rotation[0] = x
         if y is not None: self.rotation[1] = y
@@ -340,7 +346,8 @@ class MeshViewer(QWidget):
         self.glWidget4 = MyGLWidget()
         self.glWidget5 = MyGLWidget()
         self.glWidget6 = MyGLWidget()
-
+        self.current_width = 1920
+        self.current_height = 1080
         # 创建控制面板
         controlPanel = self.createControlPanel()
 
@@ -368,6 +375,7 @@ class MeshViewer(QWidget):
         mainLayout.addLayout(rightLayout, 2)  # 右侧占 2 份
         self.setLayout(mainLayout)
 
+    
     def createControlPanel(self):
         panel = QWidget()
         layout = QVBoxLayout()
@@ -391,49 +399,108 @@ class MeshViewer(QWidget):
         layout.addWidget(btnLoadCamera)
 
         # 创建标签和输入框
-        self.weight_label = QLabel('Weight:')
-        self.weight_input = QLineEdit()
-        self.weight_input.setPlaceholderText('Enter your weight')
+        self.width_label = QLabel('Width:')
+        self.width_input = QLineEdit()
+        self.width_input.setPlaceholderText('Enter your width')
+        self.width_input.setText(str(self.current_width))  # 设置当前宽度值
 
         self.height_label = QLabel('Height:')
         self.height_input = QLineEdit()
         self.height_input.setPlaceholderText('Enter your height')
+        self.height_input.setText(str(self.current_height))  # 设置当前高度值
 
         # 创建提交按钮
         self.submit_button = QPushButton('Submit weight and height（only active after loading camera params）')
         self.submit_button.clicked.connect(self.on_submit)
 
         # 将控件添加到布局中
-        layout.addWidget(self.weight_label)
-        layout.addWidget(self.weight_input)
+        layout.addWidget(self.width_label)
+        layout.addWidget(self.width_input)
         layout.addWidget(self.height_label)
         layout.addWidget(self.height_input)
         layout.addWidget(self.submit_button)
 
         # 本地图片加载按钮
+        image_layout1 = QHBoxLayout()
         btnLoadImage1 = QPushButton("Load Background Image 1")
         btnLoadImage1.clicked.connect(self.loadBackgroundImage1)
-        layout.addWidget(btnLoadImage1)
+        image_layout1.addWidget(btnLoadImage1)
+        # 去畸变按钮
+        btnDistortionCorrection1 = QPushButton("Enable Distortion Correction")
+        btnDistortionCorrection1.setCheckable(True)  # 设置按钮为可选中
+        btnDistortionCorrection1.clicked.connect(self.toggle_distortion1)
+        self.distortion_enabled1 = False  # 默认不启用去畸变
+        # 将按钮添加到水平布局
+        image_layout1.addWidget(btnLoadImage1)
+        image_layout1.addWidget(btnDistortionCorrection1)
+        layout.addLayout(image_layout1)
 
+        image_layout2 = QHBoxLayout()
         btnLoadImage2 = QPushButton("Load Background Image 2")
         btnLoadImage2.clicked.connect(self.loadBackgroundImage2)
-        layout.addWidget(btnLoadImage2)
+        image_layout2.addWidget(btnLoadImage2)
+        # 去畸变按钮
+        btnDistortionCorrection2 = QPushButton("Enable Distortion Correction")
+        btnDistortionCorrection2.setCheckable(True)  # 设置按钮为可选中
+        btnDistortionCorrection2.clicked.connect(self.toggle_distortion2)
+        self.distortion_enabled2 = False  # 默认不启用去畸变
+        # 将按钮添加到水平布局
+        image_layout2.addWidget(btnLoadImage2)
+        image_layout2.addWidget(btnDistortionCorrection2)
+        layout.addLayout(image_layout2)
 
+        image_layout3 = QHBoxLayout()
         btnLoadImage3 = QPushButton("Load Background Image 3")
         btnLoadImage3.clicked.connect(self.loadBackgroundImage3)
-        layout.addWidget(btnLoadImage3)
+        image_layout3.addWidget(btnLoadImage3)
+        # 去畸变按钮
+        btnDistortionCorrection3 = QPushButton("Enable Distortion Correction")
+        btnDistortionCorrection3.setCheckable(True)
+        btnDistortionCorrection3.clicked.connect(self.toggle_distortion3)
+        self.distortion_enabled3 = False
+        image_layout3.addWidget(btnLoadImage3)
+        image_layout3.addWidget(btnDistortionCorrection3)
+        layout.addLayout(image_layout3)
 
+        image_layout4 = QHBoxLayout()
         btnLoadImage4 = QPushButton("Load Background Image 4")
         btnLoadImage4.clicked.connect(self.loadBackgroundImage4)
-        layout.addWidget(btnLoadImage4)
+        image_layout4.addWidget(btnLoadImage4)
+        # 去畸变按钮
+        btnDistortionCorrection4 = QPushButton("Enable Distortion Correction")
+        btnDistortionCorrection4.setCheckable(True)
+        btnDistortionCorrection4.clicked.connect(self.toggle_distortion4)
+        self.distortion_enabled4 = False
+        image_layout4.addWidget(btnLoadImage4)
+        image_layout4.addWidget(btnDistortionCorrection4)
+        layout.addLayout(image_layout4)
 
-        btnLoadImage5 = QPushButton("Load Background Image 5") 
+        image_layout5 = QHBoxLayout()
+        btnLoadImage5 = QPushButton("Load Background Image 5")
         btnLoadImage5.clicked.connect(self.loadBackgroundImage5)
-        layout.addWidget(btnLoadImage5)
+        image_layout5.addWidget(btnLoadImage5)
+        # 去畸变按钮
+        btnDistortionCorrection5 = QPushButton("Enable Distortion Correction")
+        btnDistortionCorrection5.setCheckable(True)
+        btnDistortionCorrection5.clicked.connect(self.toggle_distortion5)
+        self.distortion_enabled5 = False
+        image_layout5.addWidget(btnLoadImage5)
+        image_layout5.addWidget(btnDistortionCorrection5)
+        layout.addLayout(image_layout5)
 
+        image_layout6 = QHBoxLayout()
         btnLoadImage6 = QPushButton("Load Background Image 6")
         btnLoadImage6.clicked.connect(self.loadBackgroundImage6)
-        layout.addWidget(btnLoadImage6)
+        image_layout6.addWidget(btnLoadImage6)
+        # 去畸变按钮
+        btnDistortionCorrection6 = QPushButton("Enable Distortion Correction")
+        btnDistortionCorrection6.setCheckable(True)
+        btnDistortionCorrection6.clicked.connect(self.toggle_distortion6)
+        self.distortion_enabled6 = False
+        image_layout6.addWidget(btnLoadImage6)
+        image_layout6.addWidget(btnDistortionCorrection6)
+        layout.addLayout(image_layout6)
+
 
         # 相机选择下拉框
         layout.addWidget(QLabel("Select Camera for Widget 1:"))
@@ -479,21 +546,52 @@ class MeshViewer(QWidget):
         layout.addStretch()
         panel.setLayout(layout)
         return panel
+    
+    def toggle_distortion1(self):
+        """切换是否进行去畸变"""
+        self.distortion_enabled1 = not self.distortion_enabled1
+        self.glWidget1.set_distortion_enabled(self.distortion_enabled1)
 
+    def toggle_distortion2(self):
+        """切换是否进行去畸变"""
+        self.distortion_enabled2 = not self.distortion_enabled2
+        self.glWidget2.set_distortion_enabled(self.distortion_enabled2)
+    
+    def toggle_distortion3(self):
+        """切换是否进行去畸变"""
+        self.distortion_enabled3 = not self.distortion_enabled3
+        self.glWidget3.set_distortion_enabled(self.distortion_enabled3)
+
+    def toggle_distortion4(self):
+        """切换是否进行去畸变"""
+        self.distortion_enabled4 = not self.distortion_enabled4
+        self.glWidget4.set_distortion_enabled(self.distortion_enabled4)
+
+    def toggle_distortion5(self):
+        """切换是否进行去畸变"""
+        self.distortion_enabled5 = not self.distortion_enabled5
+        self.glWidget5.set_distortion_enabled(self.distortion_enabled5)
+
+    def toggle_distortion6(self):
+        """切换是否进行去畸变"""
+        self.distortion_enabled6 = not self.distortion_enabled6
+        self.glWidget6.set_distortion_enabled(self.distortion_enabled6)  
     def on_submit(self):
-        weight = int(self.weight_input.text())
+        self.current_height = int(self.height_input.text())
+        self.current_width = int(self.width_input.text())
+        width = int(self.width_input.text())
         height = int(self.height_input.text())
-        self.glWidget1.set_weight(weight)
+        self.glWidget1.set_weight(width)
         self.glWidget1.set_height(height)
-        self.glWidget2.set_weight(weight)
+        self.glWidget2.set_weight(width)
         self.glWidget2.set_height(height)
-        self.glWidget3.set_weight(weight)
+        self.glWidget3.set_weight(width)
         self.glWidget3.set_height(height)
-        self.glWidget4.set_weight(weight)
+        self.glWidget4.set_weight(width)
         self.glWidget4.set_height(height)
-        self.glWidget5.set_weight(weight)
+        self.glWidget5.set_weight(width)
         self.glWidget5.set_height(height)
-        self.glWidget6.set_weight(weight)
+        self.glWidget6.set_weight(width)
         self.glWidget6.set_height(height)
         self.glWidget1.update()
         self.glWidget2.update()
