@@ -605,15 +605,18 @@ class MeshViewer(QWidget):
         rotation_degrees = self.get_rotation()  # 假设此方法返回旋转角度列表
         translation = self.get_translation()    # 假设此方法返回平移向量
         scale = self.get_scale()                # 假设此方法返回缩放因子
-
-        # 将旋转角度转换为四元数
+        #TODO:DEBUG
+        # 将旋转角度转换为弧度
         rotation_radians = np.radians(rotation_degrees)
-        rotation_matrix = R.from_euler('xyz', rotation_radians).as_matrix()
+        #按照x,y,z顺序旋转,注意'XYZ'大写
+        rotation_matrix = R.from_euler('XYZ', rotation_radians).as_matrix()
+        #[x,,y,z,w]
         rotation_quaternion = R.from_matrix(rotation_matrix).as_quat()
-
+        # 调整顺序[x,y,z,w] -> [w,x,y,z]
+        rotation_quaternion = [rotation_quaternion[3], rotation_quaternion[0], rotation_quaternion[1], rotation_quaternion[2]]
         # 创建参数字典
         transform_params = {
-            'rotation': rotation_quaternion.tolist(),
+            'rotation': rotation_quaternion,
             'translation': translation,
             'scale': scale
         }
