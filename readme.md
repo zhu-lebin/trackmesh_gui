@@ -14,3 +14,6 @@
 - 修改了相机内参外参导入之后设置视图矩阵和投影矩阵的bug，参考https://blog.csdn.net/yanglusheng/article/details/52268234
 由于opencv和opengl的默认相机旋转朝向不同，所以要将opengl的相机先绕x轴旋转180度到opencv的相机位置，或者说将opencv的相机旋转平移参数乘一个旋转矩阵；另一个bug是opengl的矩阵用列主序存储和numpy不一样
 - 添加了图像自动去畸变
+
+3.5
+- 添加能读取带纹理网格的trackmesh_yml_tex.py，使用了自定义shader，代码改得比较糙无法读取无纹理的网格
