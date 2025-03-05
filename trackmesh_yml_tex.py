@@ -16,7 +16,6 @@ from scipy.spatial.transform import Rotation as R
 from OpenGL.GL import *
 from OpenGL.GLUT import *
 from OpenGL.GLU import *
-from pyrr import Vector3, Matrix44
 #TODO检查导出参数
 #修改了着色器，只是用了diffuse map，代码需要优化修正,想改成test1的样子，在set_mesh里初始化网格数据的
 #现在不支持无纹理的mesh了
