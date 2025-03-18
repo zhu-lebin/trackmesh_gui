@@ -42,13 +42,14 @@ class MyGLWidget(QOpenGLWidget):
         self.camera_param = None
 
         # 背景图片
-        self.background_image = None
+        self.background_image_path = None
         #默认渲染视口大小
         self.width_value = 1920  # 默认宽度
         self.height_value = 1080 # 默认高度
         self.distortion_enabled = False  # 默认不启用去畸变
 
         self.diffuse_texture = None
+        self.background_texture = None 
         self.normal_texture = None
         self.ao_texture = None
         self.diffuse_map = None
@@ -82,7 +83,8 @@ class MyGLWidget(QOpenGLWidget):
 
     def set_background_image(self, image_path):
         """设置背景图片"""
-        self.background_image = QImage(image_path)
+        self.background_image_path = image_path
+        self.load_background_texture()
         self.update()
 
     #     return program
@@ -233,6 +235,11 @@ class MyGLWidget(QOpenGLWidget):
         glMatrixMode(GL_MODELVIEW)
 
     def draw_axes(self):
+        glDisable(GL_LIGHTING)
+        glDisable(GL_DEPTH_TEST)
+        glDisable(GL_TEXTURE_2D) 
+        #背景图片使用的是 SRGB 颜色空间，但 OpenGL 以线性颜色空间渲染，可能导致颜色混合变暗
+        glEnable(GL_FRAMEBUFFER_SRGB)
         # 设置坐标轴的颜色和宽度
         glLineWidth(2)
         
@@ -261,10 +268,10 @@ class MyGLWidget(QOpenGLWidget):
 
     def draw_axes_with_camera(self):
 
-        # #坐标轴旋转回到世界坐标轴,注意旋转顺序必须倒过来因为旋转操作没有交换性
-        glRotatef(-self.rotation[2], 0, 0, 1)
-        glRotatef(-self.rotation[1], 0, 1, 0)
-        glRotatef(-self.rotation[0], 1, 0, 0)
+        # # #坐标轴旋转回到世界坐标轴,注意旋转顺序必须倒过来因为旋转操作没有交换性
+        # glRotatef(-self.rotation[2], 0, 0, 1)
+        # glRotatef(-self.rotation[1], 0, 1, 0)
+        # glRotatef(-self.rotation[0], 1, 0, 0)
         #平移回原点     
         #glTranslatef(-self.translation[0], -self.translation[1], -self.translation[2])
         glScalef(0.5, 0.5, 0.5)  # 坐标轴的缩放（固定大小）
@@ -377,12 +384,21 @@ class MyGLWidget(QOpenGLWidget):
 
     def paintGL(self):
         # 清除颜色缓冲区和深度缓冲区
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glLoadIdentity()
 
+        # 启用混合以实现透明效果
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+        glEnable(GL_TEXTURE_2D)
+        glEnable(GL_DEPTH_TEST)
+        glDepthMask(GL_FALSE)  # 禁止写入深度缓冲区，防止背景当到物体前面
         # 绘制背景图片
-        if self.background_image:
+        if self.background_image_path:
+            #print("draw background")
             self.draw_background()
+        glDepthMask(GL_TRUE)   # 允许写入深度缓冲区
         view_matrix = np.eye(4, dtype=np.float32)
         proj_matrix = np.eye(4, dtype=np.float32)
         projection = self.orthographic_projection(-4, 4, -4, 4, -10, 10)
@@ -394,7 +410,7 @@ class MyGLWidget(QOpenGLWidget):
             fx, fy = K[0, 0], K[1, 1]
             cx, cy = K[0, 2], K[1, 2]
             n=0.1
-            f=100
+            f=30
             w=self.width_value
             h=self.height_value
             left = -cx * n / fx
@@ -444,17 +460,12 @@ class MyGLWidget(QOpenGLWidget):
         # 使用共享变换参数（平移 -> 旋转 -> 缩放）
         glTranslatef(*self.translation)
 
-        glRotatef(self.rotation[0], 1, 0, 0)
-        glRotatef(self.rotation[1], 0, 1, 0)
-        glRotatef(self.rotation[2], 0, 0, 1)
+        # glRotatef(self.rotation[0], 1, 0, 0)
+        # glRotatef(self.rotation[1], 0, 1, 0)
+        # glRotatef(self.rotation[2], 0, 0, 1)
         glScalef(*self.scale)
 
-        # 启用混合以实现透明效果
-        glEnable(GL_BLEND)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
-        glEnable(GL_TEXTURE_2D)
-        glEnable(GL_DEPTH_TEST)
 
         if self.diffuse_map is not None:
             # 初始化网格数据
@@ -493,10 +504,10 @@ class MyGLWidget(QOpenGLWidget):
     def draw_quad(self):
         vertices = [
             # 位置          # 纹理坐标
-            -0.5, -0.5, 0.0, 0.0, 0.0,
-             0.5, -0.5, 0.0, 1.0, 0.0,
-             0.5,  0.5, 0.0, 1.0, 1.0,
-            -0.5,  0.5, 0.0, 0.0, 1.0
+            -1, -1, 0, 0.0, 0.0,
+             1, -1, 0, 1.0, 0.0,
+             1,  1, 0, 1.0, 1.0,
+            -1,  1, 0, 0.0, 1.0
         ]
         indices = [0, 1, 2, 2, 3, 0]
 
@@ -519,34 +530,73 @@ class MyGLWidget(QOpenGLWidget):
         glUseProgram(0)
 
 
+
     def draw_background(self):
-        """绘制背景图片"""
-        painter = QPainter(self)
+        """使用 OpenGL 纹理绘制背景"""
+         # 绑定着色器程序
+        glUseProgram(self.shader_program)
+
+        # 绑定纹理
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D, self.background_texture)
+        glUniform1i(glGetUniformLocation(self.shader_program, "textureSampler"), 0)
+        #GL_TRUE 表示 转置矩阵,但是不要用这个参数，我也不知道为什么用了会出错不如自己手动转置
+        C =    np.array([
+                    [1,  0,  0],
+                    [0, -1,  0],
+                    [0,  0, -1]
+                ], dtype=np.float32)
+        model = np.eye(4, dtype=np.float32)
+        view = np.eye(4, dtype=np.float32)
+        view[:3, :3] = C
+        projection = self.orthographic_projection(-1, 1, -1, 1, -10, 10)
+        #projection = np.eye(4, dtype=np.float32)
+        glUniformMatrix4fv(glGetUniformLocation(self.shader_program, "model"), 1, GL_FALSE, model.T)
+        glUniformMatrix4fv(glGetUniformLocation(self.shader_program, "view"), 1, GL_FALSE, view.T)
+        glUniformMatrix4fv(glGetUniformLocation(self.shader_program, "projection"), 1, GL_FALSE, projection.T)
+        # 绘制四边形
+        self.draw_quad()
+
+    def load_background_texture(self):
+        """将背景图像转换为 OpenGL 纹理"""
+        image = QImage(self.background_image_path)
+        image = image.convertToFormat(QImage.Format_RGBA8888)
+         # 获取图像数据并转换为bytes
+        img_data = image.bits().asstring(image.sizeInBytes())
+        width, height = image.width(), image.height()
+
+        ptr = image.bits()
+        ptr.setsize(image.byteCount())
+        img_data = np.array(ptr, dtype=np.uint8).reshape((height, width, 4))  # QImage 默认 RGBA
+
+        #
         if self.camera_param is not None and self.distortion_enabled:
-            # 获取相机内参
+            print("去畸变")
             K = np.array(self.camera_param['K'], dtype=np.float32).reshape((3, 3))
             distCoeffs = np.array(self.camera_param['dist'], dtype=np.float32)
 
-            width = self.background_image.width()
-            height = self.background_image.height()
-            ptr = self.background_image.bits()
-            ptr.setsize(self.background_image.byteCount())
-            arr = np.array(ptr).reshape(height, width, 4)  # 4 表示 RGBA 格式
-            arr = arr[..., :3]  # 只取 RGB 通道
-            image = cv2.undistort(arr, K, distCoeffs)
-            image = np.uint8(np.clip(image, 0, 255))
-            # 转换为 RGB 格式 OpenCV 默认使用 BGR 格式存储图像，而 Qt 中的 QImage 默认使用 RGB 格式
-            image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            # 转换去畸变后的 NumPy 数组为 QImage
-            corrected_image = QImage(image_rgb.data, width, height, QImage.Format_RGB888)
-            painter.drawImage(self.rect(), corrected_image)
-        else:
-            painter.drawImage(self.rect(), self.background_image)
-        painter.end()
+            # OpenCV 期望输入是 **BGR** 格式，先转换
+            img_bgr = cv2.cvtColor(img_data, cv2.COLOR_RGBA2BGR)
+
+            # 进行去畸变
+            undistorted_img = cv2.undistort(img_bgr, K, distCoeffs)
+
+            # 转回 OpenGL 需要的 **RGBA**
+            img_data = cv2.cvtColor(undistorted_img, cv2.COLOR_BGR2RGBA)
+
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
+        self.background_texture = glGenTextures(1)
+        glBindTexture(GL_TEXTURE_2D, self.background_texture)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, img_data)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+        glBindTexture(GL_TEXTURE_2D, 0)
 
 
     def set_distortion_enabled(self, enabled):
         self.distortion_enabled = enabled
+        if self.background_image_path:
+            self.load_background_texture()
         self.update()
  
     def set_rotation(self, x=None, y=None, z=None):
@@ -985,7 +1035,7 @@ class MeshViewer(QWidget):
         names_node = fs.getNode("names")
         names = []
         for i in range(names_node.size()):
-            names.append(int(names_node.at(i).string()))
+            names.append(names_node.at(i).string())
 
         # 为每个name读取对应参数
         params_dict = {}
@@ -1007,7 +1057,7 @@ class MeshViewer(QWidget):
         names_node = fs.getNode("names")
         names = []
         for i in range(names_node.size()):
-            names.append(int(names_node.at(i).string()))
+            names.append(names_node.at(i).string())
 
         # 为每个name读取对应参数
         params_dict = {}
