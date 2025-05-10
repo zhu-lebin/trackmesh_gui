@@ -5,21 +5,24 @@ import math
 import cv2
 import numpy as np
 import os
+#防止报错链接了多个不同来源的 OpenMP 
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor, QOpenGLVersionProfile, QPixmap, QSurfaceFormat, QImage, QPainter
-from PyQt5.QtWidgets import (QApplication, QWidget, QOpenGLWidget,
+from PyQt5.QtWidgets import (QApplication, QWidget, QOpenGLWidget,QMessageBox,
                              QHBoxLayout, QVBoxLayout, QPushButton, 
                              QFileDialog, QSlider, QSpinBox, QDoubleSpinBox,
                              QGroupBox, QFormLayout, QLabel, QComboBox, QGraphicsView, QGraphicsScene, QLineEdit)
 from scipy.spatial.transform import Rotation as R
+import torch
+from pytorch3d.io import load_obj
 from OpenGL.GL import *
 from OpenGL.GLUT import *
 from OpenGL.GLU import *
 #TODO检查导出参数
 #修改了着色器，只是用了diffuse map，代码需要优化修正,想改成test1的样子，在set_mesh里初始化网格数据的
 #现在不支持无纹理的mesh了
-
 class MyGLWidget(QOpenGLWidget):
     def __init__(self, parent=None):
         super(MyGLWidget, self).__init__(parent)
@@ -50,24 +53,25 @@ class MyGLWidget(QOpenGLWidget):
 
         self.diffuse_texture = None
         self.background_texture = None 
-        self.normal_texture = None
-        self.ao_texture = None
+        # self.normal_texture = None
+        # self.ao_texture = None
         self.diffuse_map = None
-        self.normal_map = None
-        self.ao_map = None
+        # self.normal_map = None
+        # self.ao_map = None
         self.reflectivity = 0
         self.shader_program = None
 
-    def set_mesh(self, vertices, faces,normals, textures, materials):
-        self.vertices = vertices
-        self.faces = faces
-        self.normals = normals
-        self.textures = textures
-        self.materials = materials
-        self.diffuse_map = materials['map_Kd'] if 'map_Kd' in materials else None
-        self.normal_map = materials['norm'] if 'norm' in materials else None
-        self.ao_map = materials['map_ao'] if 'map_ao' in materials else None
-        self.reflectivity = materials['Pr'] if 'Pr' in materials else 0
+    def set_mesh(self, vertices, indices, material):
+        self.unique_vertices = vertices
+        self.unique_faces = indices
+        #纹理贴图路径
+        self.diffuse_map = material['map_Kd'] if material is not None else None
+        #暂时不考虑法向以及其他类型贴图
+        # self.normals = normals
+        # self.textures = textures
+        # self.normal_map = materials['norm'] if 'norm' in materials else None
+        # self.ao_map = materials['map_ao'] if 'map_ao' in materials else None
+        # self.reflectivity = materials['Pr'] if 'Pr' in materials else 0
         # if self.diffuse_map is not None:
         #     # 初始化网格数据
         #     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
@@ -103,28 +107,33 @@ class MyGLWidget(QOpenGLWidget):
         # 初始化着色器
         self.init_shaders()
 
+    #TODO兼容性，png和jpg
     def load_texture_qimage(self, image_path):
         # 读取图像
         image = QImage(image_path)
         if image.isNull():
-            raise ValueError("Failed to load texture image!")
+            raise ValueError(f"Failed to load texture image: {image_path}")
 
-        # 转换为OpenGL支持的格式（JPG需要转换为RGBA）
-        image = image.convertToFormat(QImage.Format_RGBA8888)
-        # 获取图像数据并转换为bytes
+        # 判断是否有 alpha 通道
+        if image.hasAlphaChannel():
+            image = image.convertToFormat(QImage.Format_RGBA8888)
+            gl_format = GL_RGBA
+        else:
+            image = image.convertToFormat(QImage.Format_RGB888)
+            gl_format = GL_RGB
+
+        # 获取图像数据并转换为 bytes
+        width = image.width()
+        height = image.height()
         image_data = image.bits().asstring(image.sizeInBytes())
-        # 生成纹理ID
+
+        # 生成纹理 ID
         texture_id = glGenTextures(1)
-        texture_id = int(texture_id)  # 转换为int
+        texture_id = int(texture_id)  # 转换为 int，避免类型冲突
 
-        # 绑定纹理
+        # 绑定纹理并上传数据
         glBindTexture(GL_TEXTURE_2D, texture_id)
-
-        # 上传纹理数据
-        glTexImage2D(
-            GL_TEXTURE_2D, 0, GL_RGBA, image.width(), image.height(),
-            0, GL_RGBA, GL_UNSIGNED_BYTE, image_data
-        )
+        glTexImage2D(GL_TEXTURE_2D, 0, gl_format, width, height, 0, gl_format, GL_UNSIGNED_BYTE, image_data)
 
         # 设置纹理参数
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
@@ -133,7 +142,6 @@ class MyGLWidget(QOpenGLWidget):
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT)
 
         return texture_id
-
     def init_shaders(self):
         # 顶点着色器
         vertex_shader = """
@@ -278,30 +286,24 @@ class MyGLWidget(QOpenGLWidget):
         # 画坐标轴
         self.draw_axes()
 
-
-    def init_mesh_data(self):
-        # 将顶点坐标和纹理坐标打包为交错数组
+##TODO处理新的点列和面列
+    def init_mesh_data(self, unique_vertices, indices, is_blender=False):
+        # 构造交错的顶点数据数组： [x, y, z, u, v, x, y, z, u, v, ...]
         self.vertex_data = []
-        self.indices = []
-        #print(self.faces)
-        for face in self.faces:
-            self.indices.extend(face)
-        for i in range(len(self.vertices)):
-            #纹理坐标系与 OpenGL 的默认坐标系 不同,OpenGL 的纹理坐标系原点 (0, 0) 位于 左下角,许多图像格式（如 PNG、JPEG）坐标系原点 (0, 0) 位于 左上角
-            self.vertex_data.extend(self.vertices[i])
-            self.vertex_data.extend([self.textures[i][0]])
-            self.vertex_data.extend([1-self.textures[i][1]])
 
-        # 将数据转换为 numpy 数组
+        for pos, uv in unique_vertices:
+            self.vertex_data.extend(pos.tolist())
+            if is_blender:
+                self.vertex_data.extend(uv.tolist())
+            else:
+                self.vertex_data.extend([uv[0].item(), 1 - uv[1].item()])  # y 轴翻转
+
         self.vertex_data = np.array(self.vertex_data, dtype=np.float32)
-        self.indices = np.array(self.indices, dtype=np.uint32)
-        # self.indices = np.roll(self.indices,1)
-        #print(self.vertex_data[0:10])
-        #print(self.indices[0:120])
-        # 生成 VAO、VBO
+        self.indices = np.array(indices, dtype=np.uint32)
+
+        # 创建 VAO 和 VBO
         self.vao = glGenVertexArrays(1)
         self.vbo = glGenBuffers(1)
-
         # 绑定 VAO
         glBindVertexArray(self.vao)
 
@@ -324,6 +326,7 @@ class MyGLWidget(QOpenGLWidget):
 
         # 解绑 VAO
         glBindVertexArray(0)
+
 
 
     def get_model_matrix(self,translation, rotation_degrees, scale):
@@ -469,7 +472,8 @@ class MyGLWidget(QOpenGLWidget):
 
         if self.diffuse_map is not None:
             # 初始化网格数据
-            self.init_mesh_data()
+            #TODO兼容性修改
+            self.init_mesh_data(self.unique_vertices,self.unique_faces,is_blender=False)
             # 绑定着色器程序
             glUseProgram(self.shader_program)
             glUniform1i(glGetUniformLocation(self.shader_program, "textureSampler"), 0)
@@ -495,8 +499,21 @@ class MyGLWidget(QOpenGLWidget):
             # 解绑
             glBindVertexArray(0)
             # self.draw_quad()
-        # 解绑着色器程序
-        glUseProgram(0)
+            # 解绑着色器程序
+            glUseProgram(0)
+        # else: 
+        #     # 如果没有纹理，则绘制白色网格
+        #     glColor3f(1.0, 1.0, 1.0)
+        #     glBegin(GL_TRIANGLES)
+        #     vertex_data = []
+        #     for pos, uv in self.unique_vertices:
+        #         vertex_data.extend(pos.tolist())
+        #     for i in range(len(self.unique_faces)):
+        #         index = self.unique_faces[i]
+        #         vertex = vertex_data[index]
+        #         glVertex3f(vertex[0][0], vertex[0][1], vertex[0][2])
+        #     glEnd()
+
         self.draw_axes_with_camera()        
         # 禁用混合
         glDisable(GL_BLEND)
@@ -1013,19 +1030,84 @@ class MeshViewer(QWidget):
             return
 
         try:
-            vertices, faces, normals, textures, materials = self.parseOBJ(filename)
-            # vertices, faces, _, _, _ = self.parseOBJ(filename)
-            if vertices and faces:
-                # 打印 vertices 和 faces 的大小
-                print(f"Number of vertices: {len(vertices)}")
-                print(f"Number of faces: {len(faces)}")
-                
-                # 更新所有的 OpenGL 小部件
-                for widget in [self.glWidget1, self.glWidget2, self.glWidget3, self.glWidget4, self.glWidget5, self.glWidget6]:
-                    widget.set_mesh(vertices, faces, normals, textures, materials)
-        except Exception as e:
-            print(f"Error loading OBJ file: {e}")
+            # 使用PyTorch3D加载OBJ文件
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            verts, faces, aux = load_obj(
+                filename,
+                load_textures=True,
+                device=device,
+                create_texture_atlas=True,
+                texture_atlas_size=4,
+            )
+            # print(verts)
+            # print(faces)
+            # print(aux)
+            # 转换顶点数据
+            vertices = verts.cpu().numpy()
+            
+            # 转换面数据(注意OBJ索引从1开始，PyTorch3D会转换为0开始，之前我们的处理也是从0开始)
+            # faces_idx = faces.verts_idx.cpu().numpy().tolist()
+            v_idx = faces.verts_idx.cpu().numpy()
+            vt_idx = faces.textures_idx.cpu().numpy()
+            # 转换法线数据(如果有)
+            normals = aux.normals.cpu().numpy() if aux.normals is not None else []
+            # if aux.verts_uvs is None:
+            #     QMessageBox.critical(None, "加载失败", "OBJ 文件未包含纹理坐标（vt），请检查模型导出设置。")
+            #     QApplication.quit()  # 或者 sys.exit()
+            # 转换纹理坐标(如果有)
+            textures = aux.verts_uvs.cpu().numpy() if aux.verts_uvs is not None else []
+            print(f"Number of vertices: {len(vertices.tolist())}")
+            print(f"Number of faces: {len(v_idx.tolist())}")
+            print(f"Number of tex: {len(textures.tolist())}")
+            print(f"Number of normals: {len(normals.tolist())}")
+            # 面索引：顶点索引和纹理索引
 
+            # 构建唯一的 (v_idx, vt_idx) 映射
+            #unique_vertices为新的点列（x,y,z,u,v)，indices为新的面列表（面数不变）
+            unique_vertices = []
+            vertex_map = {}   # key: (v, vt) → index
+            indices = []
+            for i in range(v_idx.shape[0]):
+                for j in range(3):
+                    vi = v_idx[i, j].item()
+                    ti = vt_idx[i, j].item()
+                    key = (vi, ti)
+                    if key not in vertex_map:
+                        pos = vertices[vi]
+                        uv = textures[ti]
+                        unique_vertices.append((pos, uv))
+                        vertex_map[key] = len(unique_vertices) - 1
+                    indices.append(vertex_map[key])
+
+            #从obj得到mtl路径
+            def get_mtllib_path(obj_path):
+                with open(obj_path, 'r') as f:
+                    for line in f:
+                        if line.startswith('mtllib'):
+                            return line.split()[1]
+                return None
+            #读取mtl文件实际上我们只需要贴图路径，当然也可以直接用pytorch3d读取的纹理图像但是懒得改了
+            mtl_filename = get_mtllib_path(filename)
+            if mtl_filename is None:
+                print("No mtllib found in the OBJ file.")
+            else:
+                print(f"mtllib found: {mtl_filename}")
+                obj_dir = os.path.dirname(os.path.abspath(filename))
+                mtl_path = os.path.join(obj_dir, mtl_filename)
+                mtl_materials = self.parseMTL(mtl_path)
+                # 读取材质文件，假设只有一个，实际上如果我们把材质id考虑进去可以处理多材质的情况
+                for mat_name, mat_data in aux.material_colors.items():
+                    material = mtl_materials[mat_name]
+                print(f"Material: {material}")
+            
+
+            # 更新所有的OpenGL小部件
+            for widget in [self.glWidget1, self.glWidget2, self.glWidget3, 
+                        self.glWidget4, self.glWidget5, self.glWidget6]:
+                widget.set_mesh(unique_vertices, indices, material)
+                
+        except Exception as e:
+            print(f"Error loading OBJ file with PyTorch3D: {e}")
  
     def read_intrinsics(self, yaml_path):
     # 打开YAML文件
@@ -1229,80 +1311,7 @@ class MeshViewer(QWidget):
         self.glWidget4.set_scale(self.scaleXSpin.value(), self.scaleXSpin.value(), self.scaleXSpin.value())
         self.glWidget5.set_scale(self.scaleXSpin.value(), self.scaleXSpin.value(), self.scaleXSpin.value())
         self.glWidget6.set_scale(self.scaleXSpin.value(), self.scaleXSpin.value(), self.scaleXSpin.value())
-
-#TODO:修改obj文件读取  
-    def parseOBJ(self, filename):
-        vertices = []
-        faces = []
-        normals = []
-        textures = []
-        materials = None
-        current_material = None
-        
-        try:
-            with open(filename, 'r') as f:
-                lines = f.readlines()
-
-            for line in lines:
-                parts = line.strip().split()
-
-                if not parts:
-                    continue
-                #TODO:临时修改问题很多
-                # 解析顶点 v [x, y, z, r, g, b] 或 v [x, y, z]
-                if parts[0] == 'v':
-                    if len(parts) == 4:  # 仅包含 x, y, z 坐标
-                        coords = list(map(float, parts[1:4]))
-                        
-                        # if current_material and materials and current_material in materials:
-                        #     material_color = materials[current_material].get('Kd', [1.0, 1.0, 1.0])  # 默认白色
-                        #     coords.extend(material_color)  # 添加材质的颜色信息
-                        # else:
-                        #     coords.extend([1.0, 1.0, 1.0])  # 默认白色
-                        vertices.append(coords)
-                    elif len(parts) == 7:  # 颜色包含 r, g, b
-                        coords = list(map(float, parts[1:7]))
-                        # 如果颜色超过 [1, 1, 1] 需要归一化
-                        if any(c > 1.0 for c in coords[3:6]):
-                            coords[3:6] = [c/255.0 for c in coords[3:6]]
-                        vertices.append(coords)
-
-                # 解析法向量 vn [x, y, z]
-                elif parts[0] == 'vn':
-                    normals.append(list(map(float, parts[1:4])))
-
-                # 解析纹理坐标 vt [u, v]
-                elif parts[0] == 'vt':
-                    textures.append(list(map(float, parts[1:3])))
-
-                # 解析面 f [v1/vt1/vn1, v2/vt2/vn2, v3/vt3/vn3]
-                elif parts[0] == 'f':
-                    face = []
-                    for v in parts[1:]:
-                        vertex_data = v.split('/')
-                        vertex_indices = int(vertex_data[0]) - 1  # 顶点索引
-                        face.append(vertex_indices)
-                    faces.append(face)
-
-                # 解析材质库 mtllib filename.mtl
-                elif parts[0] == 'mtllib':
-                    # 获取obj文件所在的目录
-                    obj_dir = os.path.dirname(os.path.abspath(filename))
-                    mtl_filename = parts[1]
-                    mtl_filepath = os.path.join(obj_dir, mtl_filename)                  
-                    materials = self.parseMTL(mtl_filepath)
-
-                # 解析使用材质 usemtl material_name
-                elif parts[0] == 'usemtl':
-                    current_material = parts[1]
-            #不知道会不会有多个材质，不考虑了
-            # print(materials)
-            # print(materials['Material'])
-            return vertices, faces, normals, textures, materials['Material']
-        except Exception as e:
-            print(f"Error reading OBJ file: {e}")
-            return [], [], [], [], []
-
+#TODO:解析mtl文件
     def parseMTL(self, filename):
         materials = {}
         current_material = None
