@@ -23,3 +23,6 @@
 
 5.10
 - 改用pytorch3d解析obj格式文件。windows配置pytorch3d注意点：先安装pytorch(1.12.0+cu116可自行调整)，使用set CUDA_HOME=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.6 set PATH=%CUDA_HOME%\bin;%CUDA_HOME%\libnvvp;%PATH%让本地环境cuda版本与conda环境一致，然后编译安装pip install "git+https://github.com/facebookresearch/pytorch3d.git@v0.7.5"。配置完pytorch3d可能会由于多个OpenMP库报错，代码中已经添加os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"防止报错；新的blender格式的obj面数据比较特别，对应的空间坐标点、纹理坐标点、法向坐标点可以不一致如f 39488/1/1 39744/2/2 39677/3/1，代码中通过自行构造一致点列解决这一问题。
+
+7.18
+- 优化了操作界面，推荐放大全屏，用滚轮来调整数值参数，修复了读取后卡死的bug

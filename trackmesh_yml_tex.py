@@ -60,6 +60,7 @@ class MyGLWidget(QOpenGLWidget):
         # self.ao_map = None
         self.reflectivity = 0
         self.shader_program = None
+        self.init_mesh = False
 
     def set_mesh(self, vertices, indices, material):
         self.unique_vertices = vertices
@@ -78,6 +79,7 @@ class MyGLWidget(QOpenGLWidget):
         #     glEnable(GL_TEXTURE_2D)
         #     glEnable(GL_DEPTH_TEST)
         #     self.init_mesh_data()
+        self.init_mesh = True
         self.update()
 
     def set_camera_param(self, param):
@@ -473,7 +475,9 @@ class MyGLWidget(QOpenGLWidget):
         if self.diffuse_map is not None:
             # 初始化网格数据
             #TODO兼容性修改
-            self.init_mesh_data(self.unique_vertices,self.unique_faces,is_blender=False)
+            if self.init_mesh:
+                self.init_mesh_data(self.unique_vertices,self.unique_faces,is_blender=False)
+                self.init_mesh = False
             # 绑定着色器程序
             glUseProgram(self.shader_program)
             glUniform1i(glGetUniformLocation(self.shader_program, "textureSampler"), 0)
@@ -736,6 +740,21 @@ class MeshViewer(QWidget):
         btnLoadImage1 = QPushButton("Load Background Image 1")
         btnLoadImage1.clicked.connect(self.loadBackgroundImage1)
         image_layout1.addWidget(btnLoadImage1)
+
+        # 添加用于显示文件名的标签
+        self.fileNameLabel1 = QLabel("No file selected")
+        self.fileNameLabel1.setMinimumWidth(200)  # 设置最小宽度
+        self.fileNameLabel1.setAlignment(Qt.AlignCenter)  # 居中显示
+        self.fileNameLabel1.setStyleSheet("""
+            QLabel {
+                border: 1px solid #c0c0c0;
+                padding: 4px;
+                background-color: #f8f8f8;
+                border-radius: 3px;
+            }
+        """)
+        image_layout1.addWidget(self.fileNameLabel1)  # 添加文件名显示
+
         # 去畸变按钮
         btnDistortionCorrection1 = QPushButton("Enable Distortion Correction")
         btnDistortionCorrection1.setCheckable(True)  # 设置按钮为可选中
@@ -750,20 +769,50 @@ class MeshViewer(QWidget):
         btnLoadImage2 = QPushButton("Load Background Image 2")
         btnLoadImage2.clicked.connect(self.loadBackgroundImage2)
         image_layout2.addWidget(btnLoadImage2)
+
+         # 添加用于显示文件名的标签
+        self.fileNameLabel2 = QLabel("No file selected")
+        self.fileNameLabel2.setMinimumWidth(200)  # 设置最小宽度
+        self.fileNameLabel2.setAlignment(Qt.AlignCenter)  # 居中显示
+        self.fileNameLabel2.setStyleSheet("""
+            QLabel {
+                border: 1px solid #c0c0c0;
+                padding: 4px;
+                background-color: #f8f8f8;
+                border-radius: 3px;
+            }
+        """)
+        image_layout2.addWidget(self.fileNameLabel2)  # 添加文件名显示
         # 去畸变按钮
         btnDistortionCorrection2 = QPushButton("Enable Distortion Correction")
         btnDistortionCorrection2.setCheckable(True)  # 设置按钮为可选中
         btnDistortionCorrection2.clicked.connect(self.toggle_distortion2)
         self.distortion_enabled2 = False  # 默认不启用去畸变
+
         # 将按钮添加到水平布局
         image_layout2.addWidget(btnLoadImage2)
         image_layout2.addWidget(btnDistortionCorrection2)
         layout.addLayout(image_layout2)
 
+
         image_layout3 = QHBoxLayout()
         btnLoadImage3 = QPushButton("Load Background Image 3")
         btnLoadImage3.clicked.connect(self.loadBackgroundImage3)
         image_layout3.addWidget(btnLoadImage3)
+
+         # 添加用于显示文件名的标签
+        self.fileNameLabel3 = QLabel("No file selected")
+        self.fileNameLabel3.setMinimumWidth(200)  # 设置最小宽度
+        self.fileNameLabel3.setAlignment(Qt.AlignCenter)  # 居中显示
+        self.fileNameLabel3.setStyleSheet("""
+            QLabel {
+                border: 1px solid #c0c0c0;
+                padding: 4px;
+                background-color: #f8f8f8;
+                border-radius: 3px;
+            }
+        """)
+        image_layout3.addWidget(self.fileNameLabel3)  # 添加文件名显示
         # 去畸变按钮
         btnDistortionCorrection3 = QPushButton("Enable Distortion Correction")
         btnDistortionCorrection3.setCheckable(True)
@@ -773,10 +822,25 @@ class MeshViewer(QWidget):
         image_layout3.addWidget(btnDistortionCorrection3)
         layout.addLayout(image_layout3)
 
+
         image_layout4 = QHBoxLayout()
         btnLoadImage4 = QPushButton("Load Background Image 4")
         btnLoadImage4.clicked.connect(self.loadBackgroundImage4)
         image_layout4.addWidget(btnLoadImage4)
+
+         # 添加用于显示文件名的标签
+        self.fileNameLabel4= QLabel("No file selected")
+        self.fileNameLabel4.setMinimumWidth(200)  # 设置最小宽度
+        self.fileNameLabel4.setAlignment(Qt.AlignCenter)  # 居中显示
+        self.fileNameLabel4.setStyleSheet("""
+            QLabel {
+                border: 1px solid #c0c0c0;
+                padding: 4px;
+                background-color: #f8f8f8;
+                border-radius: 3px;
+            }
+        """)
+        image_layout4.addWidget(self.fileNameLabel4)  # 添加文件名显示
         # 去畸变按钮
         btnDistortionCorrection4 = QPushButton("Enable Distortion Correction")
         btnDistortionCorrection4.setCheckable(True)
@@ -790,6 +854,20 @@ class MeshViewer(QWidget):
         btnLoadImage5 = QPushButton("Load Background Image 5")
         btnLoadImage5.clicked.connect(self.loadBackgroundImage5)
         image_layout5.addWidget(btnLoadImage5)
+
+         # 添加用于显示文件名的标签
+        self.fileNameLabel5 = QLabel("No file selected")
+        self.fileNameLabel5.setMinimumWidth(200)  # 设置最小宽度
+        self.fileNameLabel5.setAlignment(Qt.AlignCenter)  # 居中显示
+        self.fileNameLabel5.setStyleSheet("""
+            QLabel {
+                border: 1px solid #c0c0c0;
+                padding: 4px;
+                background-color: #f8f8f8;
+                border-radius: 3px;
+            }
+        """)
+        image_layout5.addWidget(self.fileNameLabel5)  # 添加文件名显示
         # 去畸变按钮
         btnDistortionCorrection5 = QPushButton("Enable Distortion Correction")
         btnDistortionCorrection5.setCheckable(True)
@@ -803,6 +881,20 @@ class MeshViewer(QWidget):
         btnLoadImage6 = QPushButton("Load Background Image 6")
         btnLoadImage6.clicked.connect(self.loadBackgroundImage6)
         image_layout6.addWidget(btnLoadImage6)
+
+         # 添加用于显示文件名的标签
+        self.fileNameLabel6 = QLabel("No file selected")
+        self.fileNameLabel6.setMinimumWidth(200)  # 设置最小宽度
+        self.fileNameLabel6.setAlignment(Qt.AlignCenter)  # 居中显示
+        self.fileNameLabel6.setStyleSheet("""
+            QLabel {
+                border: 1px solid #c0c0c0;
+                padding: 4px;
+                background-color: #f8f8f8;
+                border-radius: 3px;
+            }
+        """)
+        image_layout6.addWidget(self.fileNameLabel6)  # 添加文件名显示
         # 去畸变按钮
         btnDistortionCorrection6 = QPushButton("Enable Distortion Correction")
         btnDistortionCorrection6.setCheckable(True)
@@ -857,7 +949,8 @@ class MeshViewer(QWidget):
         layout.addStretch()
         panel.setLayout(layout)
         return panel
-    
+
+            
     def toggle_distortion1(self):
         """切换是否进行去畸变"""
         self.distortion_enabled1 = not self.distortion_enabled1
@@ -917,14 +1010,9 @@ class MeshViewer(QWidget):
         translation = self.get_translation()    # 假设此方法返回平移向量
         scale = self.get_scale()                # 假设此方法返回缩放因子
 
-        # 将旋转角度转换为四元数
-        rotation_radians = np.radians(rotation_degrees)
-        rotation_matrix = R.from_euler('xyz', rotation_radians).as_matrix()
-        rotation_quaternion = R.from_matrix(rotation_matrix).as_quat()
-
         # 创建参数字典
         transform_params = {
-            'rotation': rotation_quaternion.tolist(),
+            'rotation': rotation_degrees,
             'translation': translation,
             'scale': scale
         }
@@ -947,82 +1035,274 @@ class MeshViewer(QWidget):
         # 返回当前缩放因子
         return self.scaleXSpin.value()
     #TODO:修改ui变化条
+   
     def createTranslationControls(self):
         group = QGroupBox("Translation Controls")
-        form = QFormLayout()
 
+        # 使用水平布局作为主布局
+        main_layout = QHBoxLayout() 
+         # 创建左侧的垂直布局用于放置平移控件
+        left_layout = QVBoxLayout()
+        # 创建表单布局用于平移控件
+        form = QFormLayout()       
+    
+        spinbox_style = """
+        QDoubleSpinBox {
+            min-width: 100px;
+            min-height: 40px;
+            padding: 2px 50px 2px 5px;  /* 为右侧按钮留出空间 */
+            font-size: 18px;  /* 增大数字框中的字号 */
+            border: 1px solid #c0c0c0;
+            border-radius: 3px;
+        }
+        """
         # X 平移
         self.transXSpin = QDoubleSpinBox()
         self.transXSpin.setRange(-30.0, 30.0)
-        self.transXSpin.setSingleStep(0.1)
+        self.transXSpin.setSingleStep(0.1)  # 默认步长
         self.transXSpin.setValue(0.0)
+        self.transXSpin.setStyleSheet(spinbox_style)  # 应用样式
         self.transXSpin.valueChanged.connect(self.translationChanged)
         form.addRow("X(red axis) Translation", self.transXSpin)
 
         # Y 平移
         self.transYSpin = QDoubleSpinBox()
         self.transYSpin.setRange(-30.0, 30.0)
-        self.transYSpin.setSingleStep(0.1)
+        self.transYSpin.setSingleStep(0.1)  # 默认步长
         self.transYSpin.setValue(0.0)
+        self.transYSpin.setStyleSheet(spinbox_style)  # 应用样式
         self.transYSpin.valueChanged.connect(self.translationChanged)
         form.addRow("Y(green axis) Translation", self.transYSpin)
 
         # Z 平移
         self.transZSpin = QDoubleSpinBox()
         self.transZSpin.setRange(-30.0, 30.0)
-        self.transZSpin.setSingleStep(0.1)
+        self.transZSpin.setSingleStep(0.1)  # 默认步长
         self.transZSpin.setValue(0.0)
+        self.transZSpin.setStyleSheet(spinbox_style)  # 应用样式
         self.transZSpin.valueChanged.connect(self.translationChanged)
         form.addRow("Z(blue axis) Translation", self.transZSpin)
 
-        group.setLayout(form)
+        left_layout.addLayout(form)
+        # 添加垂直弹簧使控件居中
+        left_layout.addStretch()
+        
+        # 创建右侧布局用于步长切换按钮
+        right_layout = QVBoxLayout()
+        right_layout.setAlignment(Qt.AlignTop)
+        # 创建步长切换按钮
+        self.stepToggleBtn1 = QPushButton("Switch to Fine Step (0.01)")
+        self.stepToggleBtn1.setCheckable(False)
+        # 移除 setCheckable(True) 调用
+        self.stepToggleBtn1.setStyleSheet("""
+            QPushButton {
+                min-width: 200px;
+                min-height: 45px;
+                max-height: 45px;
+                font-size: 14px;
+                padding: 8px;
+                background-color: #f0f0f0;  /* 默认背景色 */
+            }
+            QPushButton:pressed {
+                background-color: #d0d0d0;  /* 按下时变色 */
+            }
+        """)
+        
+        # 添加成员变量跟踪步长状态
+        self.isCoarseStep1 = True
+        
+        # 连接点击信号而不是切换信号
+        self.stepToggleBtn1.clicked.connect(self.toggleStepSize1)
+        right_layout.addWidget(self.stepToggleBtn1)
+        
+        # 添加垂直弹簧使按钮位于顶部
+        right_layout.addStretch()
+        # 将左右布局添加到主布局
+        main_layout.addLayout(left_layout, 3)  # 3/4空间给控件
+        main_layout.addLayout(right_layout, 1)  # 1/4空间给按钮
+        
+        group.setLayout(main_layout)
         return group
+
+    def toggleStepSize1(self, checked):
+        # 切换步长大小
+        self.isCoarseStep1 = not self.isCoarseStep1
+        if not self.isCoarseStep1:
+            new_step = 0.01  # 精细步长
+            self.stepToggleBtn1.setText("Switch to Fine Step (0.01)")
+        else:
+            new_step = 0.1  # 粗调步长
+            self.stepToggleBtn1.setText("Switch to Coarse Step (0.1)")
+   
+        # 更新所有spinbox的步长
+        self.transXSpin.setSingleStep(new_step)
+        self.transYSpin.setSingleStep(new_step)
+        self.transZSpin.setSingleStep(new_step)
 
     def createRotationControls(self):
         group = QGroupBox("Rotation Controls")
-        form = QFormLayout()
-
+        # 使用水平布局作为主布局
+        main_layout = QHBoxLayout() 
+         # 创建左侧的垂直布局用于放置平移控件
+        left_layout = QVBoxLayout()
+        # 创建表单布局用于平移控件
+        form = QFormLayout()       
+    
+        spinbox_style = """
+        QDoubleSpinBox {
+            min-width: 100px;
+            min-height: 40px;
+            padding: 2px 50px 2px 5px;  /* 为右侧按钮留出空间 */
+            font-size: 18px;  /* 增大数字框中的字号 */
+            border: 1px solid #c0c0c0;
+            border-radius: 3px;
+        }
+        """
         # X 旋转
         self.rotXSpin = QDoubleSpinBox()
         self.rotXSpin.setRange(-180.0, 180.0)
-        self.rotXSpin.setSingleStep(5.0)
+        self.rotXSpin.setSingleStep(10.0)
         self.rotXSpin.setValue(0)
+        self.rotXSpin.setStyleSheet(spinbox_style)  # 应用样式
         self.rotXSpin.valueChanged.connect(self.rotationChanged)
         form.addRow("X(red axis) Rotation", self.rotXSpin)
 
         # Y 旋转
         self.rotYSpin = QDoubleSpinBox()
         self.rotYSpin.setRange(-180.0, 180.0)
-        self.rotYSpin.setSingleStep(5.0)
+        self.rotYSpin.setSingleStep(10.0)
         self.rotYSpin.setValue(0)
+        self.rotYSpin.setStyleSheet(spinbox_style)  # 应用样式
         self.rotYSpin.valueChanged.connect(self.rotationChanged)
         form.addRow("Y(green axis) Rotation", self.rotYSpin)
 
         # Z 旋转
         self.rotZSpin = QDoubleSpinBox()
         self.rotZSpin.setRange(-180.0, 180.0)
-        self.rotZSpin.setSingleStep(5.0)
+        self.rotZSpin.setSingleStep(10.0)
         self.rotZSpin.setValue(0.0)
+        self.rotZSpin.setStyleSheet(spinbox_style)  # 应用样式
         self.rotZSpin.valueChanged.connect(self.rotationChanged)
         form.addRow("Z(blue axis) Rotation", self.rotZSpin)
 
-        group.setLayout(form)
+        left_layout.addLayout(form)
+        # 添加垂直弹簧使控件居中
+        left_layout.addStretch()
+        
+        # 创建右侧布局用于步长切换按钮
+        right_layout = QVBoxLayout()
+        right_layout.setAlignment(Qt.AlignTop)
+        # 创建步长切换按钮
+        self.stepToggleBtn2 = QPushButton("Switch to Fine Step (1)")
+        self.stepToggleBtn2.setCheckable(False)
+        # 移除 setCheckable(True) 调用
+        self.stepToggleBtn2.setStyleSheet("""
+            QPushButton {
+                min-width: 200px;
+                min-height: 45px;
+                max-height: 45px;
+                font-size: 14px;
+                padding: 8px;
+                background-color: #f0f0f0;  /* 默认背景色 */
+            }
+            QPushButton:pressed {
+                background-color: #d0d0d0;  /* 按下时变色 */
+            }
+        """)
+        
+        # 添加成员变量跟踪步长状态
+        self.isCoarseStep2 = True
+        
+        # 连接点击信号而不是切换信号
+        self.stepToggleBtn2.clicked.connect(self.toggleStepSize2)
+        right_layout.addWidget(self.stepToggleBtn2)
+        
+        # 添加垂直弹簧使按钮位于顶部
+        right_layout.addStretch()
+        # 将左右布局添加到主布局
+        main_layout.addLayout(left_layout, 3)  # 3/4空间给控件
+        main_layout.addLayout(right_layout, 1)  # 1/4空间给按钮
+        
+        group.setLayout(main_layout)
         return group
-
+    def toggleStepSize2(self, checked):
+        # 切换步长大小
+        self.isCoarseStep2 = not self.isCoarseStep2
+        if not self.isCoarseStep2:
+            new_step = 1  # 精细步长
+            self.stepToggleBtn2.setText("Switch to Coarse Step (10)")
+        else:
+            new_step = 10 # 粗调步长
+            self.stepToggleBtn2.setText("Switch to Fine Step (1)")
+   
+        # 更新所有spinbox的步长
+        self.rotXSpin.setSingleStep(new_step)
+        self.rotYSpin.setSingleStep(new_step)
+        self.rotZSpin.setSingleStep(new_step)
     def createScaleControls(self):
         group = QGroupBox("Scale Controls")
         form = QFormLayout()
-
+        # 创建步长切换按钮
+        self.stepToggleBtn3 = QPushButton("Switch to Fine Step (0.01)")
+        self.stepToggleBtn3.setCheckable(True)
+        self.stepToggleBtn3.setStyleSheet("QPushButton { min-width: 200px; min-height: 30px; }")
+        self.stepToggleBtn3.toggled.connect(self.toggleStepSize3)
+        form.addRow("Step Size Control", self.stepToggleBtn3)
+        spinbox_style = """
+        QDoubleSpinBox {
+            min-width: 120px;
+            min-height: 35px;  /* 增大整体高度 */
+            padding: 2px 35px 2px 5px;  /* 为右侧按钮留出空间 */
+            font-size: 18px;  /* 显著增大数字框中的字号 */
+            border: 1px solid #c0c0c0;
+            border-radius: 3px;
+        }
+        QDoubleSpinBox::up-button {
+            subcontrol-origin: border;
+            subcontrol-position: top right;
+            width: 30px;  /* 增大按钮宽度 */
+            height: 18px;  /* 增大按钮高度 */
+            /* 不设置背景和边框以保留默认箭头 */
+        }
+        QDoubleSpinBox::down-button {
+            subcontrol-origin: border;
+            subcontrol-position: bottom right;
+            width: 30px;  /* 增大按钮宽度 */
+            height: 18px;  /* 增大按钮高度 */
+            /* 不设置背景和边框以保留默认箭头 */
+        }
+        QDoubleSpinBox::up-arrow {
+            width: 16px;  /* 增大箭头尺寸 */
+            height: 16px;
+        }
+        QDoubleSpinBox::down-arrow {
+            width: 16px;  /* 增大箭头尺寸 */
+            height: 16px;
+        }
+    """
         # 缩放
         self.scaleXSpin = QDoubleSpinBox()
-        self.scaleXSpin.setRange(0.01, 20.01)
-        self.scaleXSpin.setSingleStep(0.2)
-        self.scaleXSpin.setValue(1.0)
+        self.scaleXSpin.setRange(0.01, 10.01)
+        self.scaleXSpin.setSingleStep(0.1)
+        self.scaleXSpin.setValue(0.5)
+        self.scaleXSpin.setStyleSheet(spinbox_style)
         self.scaleXSpin.valueChanged.connect(self.scaleChanged)
         form.addRow("Scale", self.scaleXSpin)
 
         group.setLayout(form)
         return group
+    
+    def toggleStepSize3(self, checked):
+        # 切换步长大小
+        if checked:
+            new_step = 0.01  # 精细步长
+            self.stepToggleBtn3.setText("Switch to Coarse Step (0.1)")
+        else:
+            new_step = 0.1  # 粗调步长
+            self.stepToggleBtn3.setText("Switch to Fine Step (0.01)")
+   
+        # 更新所有spinbox的步长
+        self.scaleXSpin.setSingleStep(new_step)
 #TODO:
     def openOBJ(self):
         filename, _ = QFileDialog.getOpenFileName(self, "Open OBJ File", "", "OBJ Files (*.obj);;All Files (*)")
@@ -1191,6 +1471,11 @@ class MeshViewer(QWidget):
         # 为每个 OpenGL 部件设置背景图片
         self.glWidget1.set_background_image(filename)
 
+        # 更新文件名显示
+        short_name = os.path.basename(filename)  # 只显示文件名，不显示完整路径
+        self.fileNameLabel1.setText(short_name)
+        self.fileNameLabel1.setToolTip(filename)  # 完整路径作为提示  
+
     def loadBackgroundImage2(self):
         """加载背景图片"""
         filename, _ = QFileDialog.getOpenFileName(self, "Load Background Image 2", "", "Image Files (*.png *.jpg *.bmp)")
@@ -1199,6 +1484,10 @@ class MeshViewer(QWidget):
 
         # 为每个 OpenGL 部件设置背景图片
         self.glWidget2.set_background_image(filename)
+                # 更新文件名显示
+        short_name = os.path.basename(filename)  # 只显示文件名，不显示完整路径
+        self.fileNameLabel2.setText(short_name)
+        self.fileNameLabel2.setToolTip(filename)  # 完整路径作为提示  
 
     def loadBackgroundImage3(self):
         """加载背景图片"""
@@ -1209,6 +1498,11 @@ class MeshViewer(QWidget):
         # 为每个 OpenGL 部件设置背景图片
         self.glWidget3.set_background_image(filename)
 
+                # 更新文件名显示
+        short_name = os.path.basename(filename)  # 只显示文件名，不显示完整路径
+        self.fileNameLabel3.setText(short_name)
+        self.fileNameLabel3.setToolTip(filename)  # 完整路径作为提示  
+
     def loadBackgroundImage4(self):
         """加载背景图片"""
         filename, _ = QFileDialog.getOpenFileName(self, "Load Background Image 4", "", "Image Files (*.png *.jpg *.bmp)")
@@ -1218,6 +1512,11 @@ class MeshViewer(QWidget):
         # 为每个 OpenGL 部件设置背景图片
         self.glWidget4.set_background_image(filename)
 
+                # 更新文件名显示
+        short_name = os.path.basename(filename)  # 只显示文件名，不显示完整路径
+        self.fileNameLabel4.setText(short_name)
+        self.fileNameLabel4.setToolTip(filename)  # 完整路径作为提示  
+
     def loadBackgroundImage5(self):
         """加载背景图片"""
         filename, _ = QFileDialog.getOpenFileName(self, "Load Background Image 5", "", "Image Files (*.png *.jpg *.bmp)")
@@ -1226,6 +1525,11 @@ class MeshViewer(QWidget):
 
         # 为每个 OpenGL 部件设置背景图片
         self.glWidget5.set_background_image(filename)
+
+                # 更新文件名显示
+        short_name = os.path.basename(filename)  # 只显示文件名，不显示完整路径
+        self.fileNameLabel5.setText(short_name)
+        self.fileNameLabel5.setToolTip(filename)  # 完整路径作为提示  
     
     def loadBackgroundImage6(self):
         """加载背景图片"""
@@ -1235,6 +1539,11 @@ class MeshViewer(QWidget):
 
         # 为每个 OpenGL 部件设置背景图片
         self.glWidget6.set_background_image(filename)
+
+                # 更新文件名显示
+        short_name = os.path.basename(filename)  # 只显示文件名，不显示完整路径
+        self.fileNameLabel6.setText(short_name)
+        self.fileNameLabel6.setToolTip(filename)  # 完整路径作为提示  
 
     def updateCameraCombos(self):
         self.cameraCombo1.clear()
