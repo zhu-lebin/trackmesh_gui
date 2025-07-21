@@ -649,7 +649,7 @@ class MeshViewer(QWidget):
         super().__init__()
         self.camera_params = []  # 存储加载的所有相机参数
         self.initUI()
-    #TODO:GUI初始化
+
     def initUI(self):
         self.setWindowTitle('OBJ Viewer with Controls')
         self.setGeometry(300, 300, 1600, 900)  # 增大窗口尺寸
@@ -663,22 +663,6 @@ class MeshViewer(QWidget):
         self.glWidget6 = MyGLWidget()
         self.current_width = 1920
         self.current_height = 1080
-        self.obj_current_dir = ""  # OBJ文件的初始目录
-        self.camera_extri_current_dir = ""  # 相机参数文件的初始目录
-        self.camera_intri_current_dir = ""  # 如果需要intri也单独设置
-        self.b1_dir = ""  # 背景图片1的初始目录
-        self.b2_dir = ""  # 背景图片2的初始目录
-        self.b3_dir = ""  # 背景图片2的初始目录
-        self.b4_dir = ""  # 背景图片2的初始目录
-        self.b5_dir = ""  # 背景图片2的初始目录
-        self.b6_dir = ""  # 背景图片2的初始目录
-        self.b1_file_name = ""  # 背景图片1的文件名
-        self.b2_file_name = ""  # 背景图片2的文件名
-        self.b3_file_name = ""  # 背景图片2的文件名
-        self.b4_file_name = ""  # 背景图片2的文件名
-        self.b5_file_name = ""  # 背景图片2的文件名
-        self.b6_file_name = ""  # 背景图片2的文件名
-
         # 创建控制面板
         controlPanel = self.createControlPanel()
 
@@ -750,13 +734,6 @@ class MeshViewer(QWidget):
         layout.addWidget(self.height_label)
         layout.addWidget(self.height_input)
         layout.addWidget(self.submit_button)
-
-        # 添加"下一个文件夹"按钮
-        image_layout0 = QHBoxLayout()
-        btnNextFolder = QPushButton("Next Folder Image")
-        btnNextFolder.clicked.connect(self.loadNextFolderImages)
-        image_layout0.addWidget(btnNextFolder)
-        layout.addWidget(btnNextFolder)
 
         # 本地图片加载按钮
         image_layout1 = QHBoxLayout()
@@ -1328,12 +1305,11 @@ class MeshViewer(QWidget):
         self.scaleXSpin.setSingleStep(new_step)
 #TODO:
     def openOBJ(self):
-        filename, _ = QFileDialog.getOpenFileName(self, "Open OBJ File", self.obj_current_dir, "OBJ Files (*.obj);;All Files (*)")
+        filename, _ = QFileDialog.getOpenFileName(self, "Open OBJ File", "", "OBJ Files (*.obj);;All Files (*)")
         if not filename:
             return
 
         try:
-            self.obj_current_dir = os.path.dirname(filename) 
             # 使用PyTorch3D加载OBJ文件
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             verts, faces, aux = load_obj(
@@ -1472,488 +1448,26 @@ class MeshViewer(QWidget):
 
 
     def openCameraINRIYML(self):
-        intri_filename, _ = QFileDialog.getOpenFileName(self, "Open Intrinsics YAML", self.camera_intri_current_dir, "YAML Files (*.yml)")
+        intri_filename, _ = QFileDialog.getOpenFileName(self, "Open Intrinsics YAML", "", "YAML Files (*.yml)")
         if not intri_filename:
             return
         else:
-            self.camera_intri_current_dir = os.path.dirname(intri_filename)  # 更新当前目录
             self.intri_filename = intri_filename
 
     def openCameraEXTRIYML(self):
-        extri_filename, _ = QFileDialog.getOpenFileName(self, "Open Extrinsics YAML", self.camera_extri_current_dir, "YAML Files (*.yml)")
+        extri_filename, _ = QFileDialog.getOpenFileName(self, "Open Extrinsics YAML", "", "YAML Files (*.yml)")
         if not extri_filename:
             return
         else:
-            self.camera_extri_current_dir = os.path.dirname(extri_filename)
             self.extri_filename = extri_filename
-    def loadNextFolderImages(self):
-        self.loadNextFolderImages1()
-        self.loadNextFolderImages2()
-        self.loadNextFolderImages3()
-        self.loadNextFolderImages4()
-        self.loadNextFolderImages5()
-        self.loadNextFolderImages6()
-    #加载下一个文件夹中的同名图片
 
-    def loadNextFolderImages1(self):
-        if not self.b1_file_name:
-            # QMessageBox.warning(self, "Warning", "Please load an image first!")
-            return   
-        # 获取当前图片的文件名（不含路径）
-        current_filename = os.path.basename(self.b1_file_name)
-        current_dir = os.path.dirname(self.b1_file_name)
-        
-        # 获取当前文件夹的父目录
-        parent_dir = os.path.dirname(current_dir)
-        current_filename1 = os.path.basename(current_dir)
-        gradparent_dir = os.path.dirname(parent_dir)
-        current_dir = os.path.normpath(current_dir)
-        parent_dir = os.path.normpath(parent_dir)
-        gradparent_dir = os.path.normpath(gradparent_dir)
-        print(f"Current directory: {current_dir}")
-        print(f"Parent directory: {parent_dir}")
-        print(f"Grandparent directory: {gradparent_dir}")
-        print(f"Current filename: {current_filename}")
-        print(f"Current filename1: {current_filename1}")
 
-        # 获取父目录下的所有子文件夹
-        try:
-            subfolders = [os.path.normpath(f.path) for f in os.scandir(gradparent_dir) if f.is_dir()]
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Cannot access directory: {str(e)}")
-            return
-
-        # 按名称排序子文件夹
-        subfolders.sort()
-        print(f"Subfolders in parent directory: {subfolders}")
-        # 找到当前文件夹在列表中的位置
-        try:
-            current_index = subfolders.index(parent_dir)
-        except ValueError:
-            QMessageBox.warning(self, "Warning", "Current folder not found in parent directory")
-            return
-            
-        # 计算下一个文件夹的索引（循环处理）
-        next_index = (current_index + 1) % len(subfolders)
-        next_folder = subfolders[next_index]
-        next_folder_images =  os.path.join(next_folder, current_filename1)
-        # 构建下一个文件夹中的同名文件路径
-        next_file_path = os.path.join(next_folder_images, current_filename)
-        print(f"Next folder: {next_folder}")
-        print(f"Next file path: {next_file_path}")
-        # 检查同名文件是否存在
-        if os.path.exists(next_file_path):
-            new_image = next_file_path
-        else:
-            # 如果同名文件不存在，则获取该文件夹中的第一张图片
-            image_files = [
-                f.path for f in os.scandir(next_folder_images) 
-                if f.is_file() and f.name.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp'))
-            ]
-            
-            if not image_files:
-                QMessageBox.warning(self, "Warning", f"No images found in {next_folder}")
-                return
-                
-            # 按文件名排序并选择第一个
-            image_files.sort()
-            new_image = image_files[0]
-        
-        # 更新背景图片
-        self.glWidget1.set_background_image(new_image)
-        
-        # 更新文件名显示
-        short_name = os.path.basename(new_image)
-        self.fileNameLabel1.setText(short_name)
-        self.fileNameLabel1.setToolTip(new_image)
-        
-        # 更新当前目录
-        self.b1_dir = os.path.dirname(new_image)
-        self.b1_file_name = new_image  # 保存文件名
-
-    def loadNextFolderImages2(self):
-        if not self.b2_file_name:
-            # QMessageBox.warning(self, "Warning", "Please load an image first!")
-            return   
-        # 获取当前图片的文件名（不含路径）
-        current_filename = os.path.basename(self.b2_file_name)
-        current_dir = os.path.dirname(self.b2_file_name)
-        
-        # 获取当前文件夹的父目录
-        parent_dir = os.path.dirname(current_dir)
-        current_filename1 = os.path.basename(current_dir)
-        gradparent_dir = os.path.dirname(parent_dir)
-        current_dir = os.path.normpath(current_dir)
-        parent_dir = os.path.normpath(parent_dir)
-        gradparent_dir = os.path.normpath(gradparent_dir)
-        print(f"Current directory: {current_dir}")
-        print(f"Parent directory: {parent_dir}")
-        print(f"Grandparent directory: {gradparent_dir}")
-        print(f"Current filename: {current_filename}")
-        print(f"Current filename1: {current_filename1}")
-
-        # 获取父目录下的所有子文件夹
-        try:
-            subfolders = [os.path.normpath(f.path) for f in os.scandir(gradparent_dir) if f.is_dir()]
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Cannot access directory: {str(e)}")
-            return
-
-        # 按名称排序子文件夹
-        subfolders.sort()
-        print(f"Subfolders in parent directory: {subfolders}")
-        # 找到当前文件夹在列表中的位置
-        try:
-            current_index = subfolders.index(parent_dir)
-        except ValueError:
-            QMessageBox.warning(self, "Warning", "Current folder not found in parent directory")
-            return
-            
-        # 计算下一个文件夹的索引（循环处理）
-        next_index = (current_index + 1) % len(subfolders)
-        next_folder = subfolders[next_index]
-        next_folder_images =  os.path.join(next_folder, current_filename1)
-        # 构建下一个文件夹中的同名文件路径
-        next_file_path = os.path.join(next_folder_images, current_filename)
-        print(f"Next folder: {next_folder}")
-        print(f"Next file path: {next_file_path}")
-        # 检查同名文件是否存在
-        if os.path.exists(next_file_path):
-            new_image = next_file_path
-        else:
-            # 如果同名文件不存在，则获取该文件夹中的第一张图片
-            image_files = [
-                f.path for f in os.scandir(next_folder_images) 
-                if f.is_file() and f.name.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp'))
-            ]
-            
-            if not image_files:
-                QMessageBox.warning(self, "Warning", f"No images found in {next_folder}")
-                return
-                
-            # 按文件名排序并选择第一个
-            image_files.sort()
-            new_image = image_files[0]
-        
-        # 更新背景图片
-        self.glWidget2.set_background_image(new_image)
-        
-        # 更新文件名显示
-        short_name = os.path.basename(new_image)
-        self.fileNameLabel2.setText(short_name)
-        self.fileNameLabel2.setToolTip(new_image)
-        
-        # 更新当前目录
-        self.b2_dir = os.path.dirname(new_image)
-        self.b2_file_name = new_image  # 保存文件名
-    def loadNextFolderImages3(self):
-        if not self.b3_file_name:
-            # QMessageBox.warning(self, "Warning", "Please load an image first!")
-            return   
-        # 获取当前图片的文件名（不含路径）
-        current_filename = os.path.basename(self.b3_file_name)
-        current_dir = os.path.dirname(self.b3_file_name)
-        
-        # 获取当前文件夹的父目录
-        parent_dir = os.path.dirname(current_dir)
-        current_filename1 = os.path.basename(current_dir)
-        gradparent_dir = os.path.dirname(parent_dir)
-        current_dir = os.path.normpath(current_dir)
-        parent_dir = os.path.normpath(parent_dir)
-        gradparent_dir = os.path.normpath(gradparent_dir)
-        print(f"Current directory: {current_dir}")
-        print(f"Parent directory: {parent_dir}")
-        print(f"Grandparent directory: {gradparent_dir}")
-        print(f"Current filename: {current_filename}")
-        print(f"Current filename1: {current_filename1}")
-
-        # 获取父目录下的所有子文件夹
-        try:
-            subfolders = [os.path.normpath(f.path) for f in os.scandir(gradparent_dir) if f.is_dir()]
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Cannot access directory: {str(e)}")
-            return
-
-        # 按名称排序子文件夹
-        subfolders.sort()
-        print(f"Subfolders in parent directory: {subfolders}")
-        # 找到当前文件夹在列表中的位置
-        try:
-            current_index = subfolders.index(parent_dir)
-        except ValueError:
-            QMessageBox.warning(self, "Warning", "Current folder not found in parent directory")
-            return
-            
-        # 计算下一个文件夹的索引（循环处理）
-        next_index = (current_index + 1) % len(subfolders)
-        next_folder = subfolders[next_index]
-        next_folder_images =  os.path.join(next_folder, current_filename1)
-        # 构建下一个文件夹中的同名文件路径
-        next_file_path = os.path.join(next_folder_images, current_filename)
-        print(f"Next folder: {next_folder}")
-        print(f"Next file path: {next_file_path}")
-        # 检查同名文件是否存在
-        if os.path.exists(next_file_path):
-            new_image = next_file_path
-        else:
-            # 如果同名文件不存在，则获取该文件夹中的第一张图片
-            image_files = [
-                f.path for f in os.scandir(next_folder_images) 
-                if f.is_file() and f.name.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp'))
-            ]
-            
-            if not image_files:
-                QMessageBox.warning(self, "Warning", f"No images found in {next_folder}")
-                return
-                
-            # 按文件名排序并选择第一个
-            image_files.sort()
-            new_image = image_files[0]
-        
-        # 更新背景图片
-        self.glWidget3.set_background_image(new_image)
-        
-        # 更新文件名显示
-        short_name = os.path.basename(new_image)
-        self.fileNameLabel3.setText(short_name)
-        self.fileNameLabel3.setToolTip(new_image)
-        
-        # 更新当前目录
-        self.b3_dir = os.path.dirname(new_image)
-        self.b3_file_name = new_image  # 保存文件名
-    def loadNextFolderImages4(self):
-        if not self.b4_file_name:
-            # QMessageBox.warning(self, "Warning", "Please load an image first!")
-            return   
-        # 获取当前图片的文件名（不含路径）
-        current_filename = os.path.basename(self.b4_file_name)
-        current_dir = os.path.dirname(self.b4_file_name)
-        
-        # 获取当前文件夹的父目录
-        parent_dir = os.path.dirname(current_dir)
-        current_filename1 = os.path.basename(current_dir)
-        gradparent_dir = os.path.dirname(parent_dir)
-        current_dir = os.path.normpath(current_dir)
-        parent_dir = os.path.normpath(parent_dir)
-        gradparent_dir = os.path.normpath(gradparent_dir)
-        print(f"Current directory: {current_dir}")
-        print(f"Parent directory: {parent_dir}")
-        print(f"Grandparent directory: {gradparent_dir}")
-        print(f"Current filename: {current_filename}")
-        print(f"Current filename1: {current_filename1}")
-
-        # 获取父目录下的所有子文件夹
-        try:
-            subfolders = [os.path.normpath(f.path) for f in os.scandir(gradparent_dir) if f.is_dir()]
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Cannot access directory: {str(e)}")
-            return
-
-        # 按名称排序子文件夹
-        subfolders.sort()
-        print(f"Subfolders in parent directory: {subfolders}")
-        # 找到当前文件夹在列表中的位置
-        try:
-            current_index = subfolders.index(parent_dir)
-        except ValueError:
-            QMessageBox.warning(self, "Warning", "Current folder not found in parent directory")
-            return
-            
-        # 计算下一个文件夹的索引（循环处理）
-        next_index = (current_index + 1) % len(subfolders)
-        next_folder = subfolders[next_index]
-        next_folder_images =  os.path.join(next_folder, current_filename1)
-        # 构建下一个文件夹中的同名文件路径
-        next_file_path = os.path.join(next_folder_images, current_filename)
-        print(f"Next folder: {next_folder}")
-        print(f"Next file path: {next_file_path}")
-        # 检查同名文件是否存在
-        if os.path.exists(next_file_path):
-            new_image = next_file_path
-        else:
-            # 如果同名文件不存在，则获取该文件夹中的第一张图片
-            image_files = [
-                f.path for f in os.scandir(next_folder_images) 
-                if f.is_file() and f.name.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp'))
-            ]
-            
-            if not image_files:
-                QMessageBox.warning(self, "Warning", f"No images found in {next_folder}")
-                return
-                
-            # 按文件名排序并选择第一个
-            image_files.sort()
-            new_image = image_files[0]
-        
-        # 更新背景图片
-        self.glWidget4.set_background_image(new_image)
-        
-        # 更新文件名显示
-        short_name = os.path.basename(new_image)
-        self.fileNameLabel4.setText(short_name)
-        self.fileNameLabel4.setToolTip(new_image)
-        
-        # 更新当前目录
-        self.b4_dir = os.path.dirname(new_image)
-        self.b4_file_name = new_image  # 保存文件名
-    def loadNextFolderImages5(self):
-        if not self.b5_file_name:
-            # QMessageBox.warning(self, "Warning", "Please load an image first!")
-            return   
-        # 获取当前图片的文件名（不含路径）
-        current_filename = os.path.basename(self.b5_file_name)
-        current_dir = os.path.dirname(self.b5_file_name)
-        
-        # 获取当前文件夹的父目录
-        parent_dir = os.path.dirname(current_dir)
-        current_filename1 = os.path.basename(current_dir)
-        gradparent_dir = os.path.dirname(parent_dir)
-        current_dir = os.path.normpath(current_dir)
-        parent_dir = os.path.normpath(parent_dir)
-        gradparent_dir = os.path.normpath(gradparent_dir)
-        print(f"Current directory: {current_dir}")
-        print(f"Parent directory: {parent_dir}")
-        print(f"Grandparent directory: {gradparent_dir}")
-        print(f"Current filename: {current_filename}")
-        print(f"Current filename1: {current_filename1}")
-
-        # 获取父目录下的所有子文件夹
-        try:
-            subfolders = [os.path.normpath(f.path) for f in os.scandir(gradparent_dir) if f.is_dir()]
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Cannot access directory: {str(e)}")
-            return
-
-        # 按名称排序子文件夹
-        subfolders.sort()
-        print(f"Subfolders in parent directory: {subfolders}")
-        # 找到当前文件夹在列表中的位置
-        try:
-            current_index = subfolders.index(parent_dir)
-        except ValueError:
-            QMessageBox.warning(self, "Warning", "Current folder not found in parent directory")
-            return
-            
-        # 计算下一个文件夹的索引（循环处理）
-        next_index = (current_index + 1) % len(subfolders)
-        next_folder = subfolders[next_index]
-        next_folder_images =  os.path.join(next_folder, current_filename1)
-        # 构建下一个文件夹中的同名文件路径
-        next_file_path = os.path.join(next_folder_images, current_filename)
-        print(f"Next folder: {next_folder}")
-        print(f"Next file path: {next_file_path}")
-        # 检查同名文件是否存在
-        if os.path.exists(next_file_path):
-            new_image = next_file_path
-        else:
-            # 如果同名文件不存在，则获取该文件夹中的第一张图片
-            image_files = [
-                f.path for f in os.scandir(next_folder_images) 
-                if f.is_file() and f.name.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp'))
-            ]
-            
-            if not image_files:
-                QMessageBox.warning(self, "Warning", f"No images found in {next_folder}")
-                return
-                
-            # 按文件名排序并选择第一个
-            image_files.sort()
-            new_image = image_files[0]
-        
-        # 更新背景图片
-        self.glWidget5.set_background_image(new_image)
-        
-        # 更新文件名显示
-        short_name = os.path.basename(new_image)
-        self.fileNameLabel5.setText(short_name)
-        self.fileNameLabel5.setToolTip(new_image)
-        
-        # 更新当前目录
-        self.b5_dir = os.path.dirname(new_image)
-        self.b5_file_name = new_image  # 保存文件名
-    def loadNextFolderImages6(self):
-        if not self.b6_file_name:
-            # QMessageBox.warning(self, "Warning", "Please load an image first!")
-            return   
-        # 获取当前图片的文件名（不含路径）
-        current_filename = os.path.basename(self.b6_file_name)
-        current_dir = os.path.dirname(self.b6_file_name)
-        
-        # 获取当前文件夹的父目录
-        parent_dir = os.path.dirname(current_dir)
-        current_filename1 = os.path.basename(current_dir)
-        gradparent_dir = os.path.dirname(parent_dir)
-        current_dir = os.path.normpath(current_dir)
-        parent_dir = os.path.normpath(parent_dir)
-        gradparent_dir = os.path.normpath(gradparent_dir)
-        print(f"Current directory: {current_dir}")
-        print(f"Parent directory: {parent_dir}")
-        print(f"Grandparent directory: {gradparent_dir}")
-        print(f"Current filename: {current_filename}")
-        print(f"Current filename1: {current_filename1}")
-
-        # 获取父目录下的所有子文件夹
-        try:
-            subfolders = [os.path.normpath(f.path) for f in os.scandir(gradparent_dir) if f.is_dir()]
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Cannot access directory: {str(e)}")
-            return
-
-        # 按名称排序子文件夹
-        subfolders.sort()
-        print(f"Subfolders in parent directory: {subfolders}")
-        # 找到当前文件夹在列表中的位置
-        try:
-            current_index = subfolders.index(parent_dir)
-        except ValueError:
-            QMessageBox.warning(self, "Warning", "Current folder not found in parent directory")
-            return
-            
-        # 计算下一个文件夹的索引（循环处理）
-        next_index = (current_index + 1) % len(subfolders)
-        next_folder = subfolders[next_index]
-        next_folder_images =  os.path.join(next_folder, current_filename1)
-        # 构建下一个文件夹中的同名文件路径
-        next_file_path = os.path.join(next_folder_images, current_filename)
-        print(f"Next folder: {next_folder}")
-        print(f"Next file path: {next_file_path}")
-        # 检查同名文件是否存在
-        if os.path.exists(next_file_path):
-            new_image = next_file_path
-        else:
-            # 如果同名文件不存在，则获取该文件夹中的第一张图片
-            image_files = [
-                f.path for f in os.scandir(next_folder_images) 
-                if f.is_file() and f.name.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp'))
-            ]
-            
-            if not image_files:
-                QMessageBox.warning(self, "Warning", f"No images found in {next_folder}")
-                return
-                
-            # 按文件名排序并选择第一个
-            image_files.sort()
-            new_image = image_files[0]
-        
-        # 更新背景图片
-        self.glWidget6.set_background_image(new_image)
-        
-        # 更新文件名显示
-        short_name = os.path.basename(new_image)
-        self.fileNameLabel6.setText(short_name)
-        self.fileNameLabel6.setToolTip(new_image)
-        
-        # 更新当前目录
-        self.b6_dir = os.path.dirname(new_image)
-        self.b6_file_name = new_image  # 保存文件名
     def loadBackgroundImage1(self):
         """加载背景图片"""
-        filename, _ = QFileDialog.getOpenFileName(self, "Load Background Image 1", self.b1_dir, "Image Files (*.png *.jpg *.bmp)")
+        filename, _ = QFileDialog.getOpenFileName(self, "Load Background Image 1", "", "Image Files (*.png *.jpg *.bmp)")
         if not filename:
             return
-        self.b1_file_name = filename  # 保存文件名
-        # 更新背景图片目录
-        self.b1_dir = os.path.dirname(filename)  # 更新当前目录
+
         # 为每个 OpenGL 部件设置背景图片
         self.glWidget1.set_background_image(filename)
 
@@ -1964,12 +1478,10 @@ class MeshViewer(QWidget):
 
     def loadBackgroundImage2(self):
         """加载背景图片"""
-        filename, _ = QFileDialog.getOpenFileName(self, "Load Background Image 2", self.b2_dir, "Image Files (*.png *.jpg *.bmp)")
+        filename, _ = QFileDialog.getOpenFileName(self, "Load Background Image 2", "", "Image Files (*.png *.jpg *.bmp)")
         if not filename:
             return
-        self.b2_file_name = filename  # 保存文件名
-        # 更新背景图片目录
-        self.b2_dir = os.path.dirname(filename)  # 更新当前目录
+
         # 为每个 OpenGL 部件设置背景图片
         self.glWidget2.set_background_image(filename)
                 # 更新文件名显示
@@ -1979,12 +1491,10 @@ class MeshViewer(QWidget):
 
     def loadBackgroundImage3(self):
         """加载背景图片"""
-        filename, _ = QFileDialog.getOpenFileName(self, "Load Background Image 3", self.b3_dir, "Image Files (*.png *.jpg *.bmp)")
+        filename, _ = QFileDialog.getOpenFileName(self, "Load Background Image 3", "", "Image Files (*.png *.jpg *.bmp)")
         if not filename:
             return
-        self.b3_file_name = filename
-        # 更新背景图片目录
-        self.b3_dir = os.path.dirname(filename)  # 更新当前目录
+
         # 为每个 OpenGL 部件设置背景图片
         self.glWidget3.set_background_image(filename)
 
@@ -1995,12 +1505,10 @@ class MeshViewer(QWidget):
 
     def loadBackgroundImage4(self):
         """加载背景图片"""
-        filename, _ = QFileDialog.getOpenFileName(self, "Load Background Image 4", self.b4_dir, "Image Files (*.png *.jpg *.bmp)")
+        filename, _ = QFileDialog.getOpenFileName(self, "Load Background Image 4", "", "Image Files (*.png *.jpg *.bmp)")
         if not filename:
             return
-        self.b4_file_name = filename
-        # 更新背景图片目录
-        self.b4_dir = os.path.dirname(filename)  # 更新当前目录
+
         # 为每个 OpenGL 部件设置背景图片
         self.glWidget4.set_background_image(filename)
 
@@ -2011,12 +1519,10 @@ class MeshViewer(QWidget):
 
     def loadBackgroundImage5(self):
         """加载背景图片"""
-        filename, _ = QFileDialog.getOpenFileName(self, "Load Background Image 5", self.b5_dir, "Image Files (*.png *.jpg *.bmp)")
+        filename, _ = QFileDialog.getOpenFileName(self, "Load Background Image 5", "", "Image Files (*.png *.jpg *.bmp)")
         if not filename:
             return
-        self.b5_file_name = filename  # 保存文件名
-        # 更新背景图片目录
-        self.b5_dir = os.path.dirname(filename)  # 更新当前目录
+
         # 为每个 OpenGL 部件设置背景图片
         self.glWidget5.set_background_image(filename)
 
@@ -2027,12 +1533,10 @@ class MeshViewer(QWidget):
     
     def loadBackgroundImage6(self):
         """加载背景图片"""
-        filename, _ = QFileDialog.getOpenFileName(self, "Load Background Image 6", self.b6_dir, "Image Files (*.png *.jpg *.bmp)")
+        filename, _ = QFileDialog.getOpenFileName(self, "Load Background Image 6", "", "Image Files (*.png *.jpg *.bmp)")
         if not filename:
             return
-        self.b6_file_name = filename
-        # 更新背景图片目录
-        self.b6_dir = os.path.dirname(filename)  # 更新当前目录
+
         # 为每个 OpenGL 部件设置背景图片
         self.glWidget6.set_background_image(filename)
 
