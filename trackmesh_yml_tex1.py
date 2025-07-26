@@ -678,7 +678,7 @@ class MeshViewer(QWidget):
         self.b4_file_name = ""  # 背景图片2的文件名
         self.b5_file_name = ""  # 背景图片2的文件名
         self.b6_file_name = ""  # 背景图片2的文件名
-
+        self.save_dir = ""  # 保存目录
         # 创建控制面板
         controlPanel = self.createControlPanel()
 
@@ -728,28 +728,6 @@ class MeshViewer(QWidget):
         btnLoadCamera = QPushButton("Load Camera Parameters")
         btnLoadCamera.clicked.connect(self.load_camera_parameters)
         layout.addWidget(btnLoadCamera)
-
-        # 创建标签和输入框
-        self.width_label = QLabel('Width:')
-        self.width_input = QLineEdit()
-        self.width_input.setPlaceholderText('Enter your width')
-        self.width_input.setText(str(self.current_width))  # 设置当前宽度值
-
-        self.height_label = QLabel('Height:')
-        self.height_input = QLineEdit()
-        self.height_input.setPlaceholderText('Enter your height')
-        self.height_input.setText(str(self.current_height))  # 设置当前高度值
-
-        # 创建提交按钮
-        self.submit_button = QPushButton('Submit weight and height（only active after loading camera params）')
-        self.submit_button.clicked.connect(self.on_submit)
-
-        # 将控件添加到布局中
-        layout.addWidget(self.width_label)
-        layout.addWidget(self.width_input)
-        layout.addWidget(self.height_label)
-        layout.addWidget(self.height_input)
-        layout.addWidget(self.submit_button)
 
         # 添加"下一个文件夹"按钮
         image_layout0 = QHBoxLayout()
@@ -1026,7 +1004,7 @@ class MeshViewer(QWidget):
         self.glWidget4.update()
         self.glWidget5.update()
         self.glWidget6.update()
-
+#TODO
     def export_parameters(self):
         # 获取旋转、平移和缩放参数
         rotation_degrees = self.get_rotation()  # 假设此方法返回旋转角度列表
@@ -1039,10 +1017,10 @@ class MeshViewer(QWidget):
             'translation': translation,
             'scale': scale
         }
-
         # 保存为JSON文件
-        filename, _ = QFileDialog.getSaveFileName(self, "保存参数文件", "", "JSON Files (*.json)")
+        filename, _ = QFileDialog.getSaveFileName(self, "保存参数文件", self.save_dir, "JSON Files (*.json)")
         if filename:
+            self.save_dir = os.path.dirname(filename)  # 更新保存目录
             with open(filename, 'w') as f:
                 json.dump(transform_params, f)
 
@@ -1072,7 +1050,7 @@ class MeshViewer(QWidget):
         spinbox_style = """
         QDoubleSpinBox {
             min-width: 100px;
-            min-height: 40px;
+            min-height: 30px;
             padding: 2px 50px 2px 5px;  /* 为右侧按钮留出空间 */
             font-size: 18px;  /* 增大数字框中的字号 */
             border: 1px solid #c0c0c0;
@@ -1174,7 +1152,7 @@ class MeshViewer(QWidget):
         spinbox_style = """
         QDoubleSpinBox {
             min-width: 100px;
-            min-height: 40px;
+            min-height: 30px;
             padding: 2px 50px 2px 5px;  /* 为右侧按钮留出空间 */
             font-size: 18px;  /* 增大数字框中的字号 */
             border: 1px solid #c0c0c0;
