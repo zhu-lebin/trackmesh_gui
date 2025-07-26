@@ -61,8 +61,14 @@ class MyGLWidget(QOpenGLWidget):
         self.reflectivity = 0
         self.shader_program = None
         self.init_mesh = False
+        self.vao = None
+        self.vbo = None
+        self.ebo = None
+        self.diffuse_texture = None
+        self.shader_program = None
 
     def set_mesh(self, vertices, indices, material):
+        self.cleanup_gl_resources()
         self.unique_vertices = vertices
         self.unique_faces = indices
         #纹理贴图路径
@@ -287,7 +293,45 @@ class MyGLWidget(QOpenGLWidget):
         glScalef(0.5, 0.5, 0.5)  # 坐标轴的缩放（固定大小）
         # 画坐标轴
         self.draw_axes()
-
+    def cleanup_gl_resources(self):
+        """安全清理所有OpenGL资源"""
+        # 确保OpenGL上下文有效
+        if not self.context() or not self.context().isValid():
+            return
+        
+        # 确保当前上下文是激活的
+        self.makeCurrent()
+        
+        try:
+            # 删除VAO
+            if self.vao is not None and glIsVertexArray(self.vao):
+                glDeleteVertexArrays(1, [self.vao])
+            self.vao = None
+            
+            # 删除VBO
+            if self.vbo is not None and glIsBuffer(self.vbo):
+                glDeleteBuffers(1, [self.vbo])
+            self.vbo = None
+            
+            # 删除EBO
+            if self.ebo is not None and glIsBuffer(self.ebo):
+                glDeleteBuffers(1, [self.ebo])
+            self.ebo = None
+            
+            # 删除纹理
+            if self.diffuse_texture is not None and glIsTexture(self.diffuse_texture):
+                glDeleteTextures(1, [self.diffuse_texture])
+            self.diffuse_texture = None
+            
+            # # 删除着色器程序
+            # if self.shader_program is not None and glIsProgram(self.shader_program):
+            #     glDeleteProgram(self.shader_program)
+            # self.shader_program = None
+        except Exception as e:
+            print(f"清理资源时出错: {e}")
+        finally:
+            # 确保释放上下文
+            self.doneCurrent()
 ##TODO处理新的点列和面列
     def init_mesh_data(self, unique_vertices, indices, is_blender=False):
         # 构造交错的顶点数据数组： [x, y, z, u, v, x, y, z, u, v, ...]
@@ -483,7 +527,8 @@ class MyGLWidget(QOpenGLWidget):
             glUniform1i(glGetUniformLocation(self.shader_program, "textureSampler"), 0)
             glActiveTexture(GL_TEXTURE0)
             #绑定纹理
-            self.diffuse_texture = self.load_texture_qimage(self.diffuse_map)
+            if not hasattr(self, 'diffuse_texture') or self.diffuse_texture is None:
+                self.diffuse_texture = self.load_texture_qimage(self.diffuse_map)
             #仅绑定 color 贴图
             glBindTexture(GL_TEXTURE_2D, self.diffuse_texture)
             #
