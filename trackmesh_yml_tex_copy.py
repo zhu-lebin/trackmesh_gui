@@ -678,7 +678,7 @@ class MeshViewer(QWidget):
         self.b4_file_name = ""  # 背景图片2的文件名
         self.b5_file_name = ""  # 背景图片2的文件名
         self.b6_file_name = ""  # 背景图片2的文件名
-        self.save_dir = ""  # 保存目录
+
         # 创建控制面板
         controlPanel = self.createControlPanel()
 
@@ -1026,7 +1026,7 @@ class MeshViewer(QWidget):
         self.glWidget4.update()
         self.glWidget5.update()
         self.glWidget6.update()
-#TODO
+
     def export_parameters(self):
         # 获取旋转、平移和缩放参数
         rotation_degrees = self.get_rotation()  # 假设此方法返回旋转角度列表
@@ -1039,10 +1039,10 @@ class MeshViewer(QWidget):
             'translation': translation,
             'scale': scale
         }
+
         # 保存为JSON文件
-        filename, _ = QFileDialog.getSaveFileName(self, "保存参数文件", self.save_dir, "JSON Files (*.json)")
+        filename, _ = QFileDialog.getSaveFileName(self, "保存参数文件", "", "JSON Files (*.json)")
         if filename:
-            self.save_dir = os.path.dirname(filename)  # 更新保存目录
             with open(filename, 'w') as f:
                 json.dump(transform_params, f)
 
