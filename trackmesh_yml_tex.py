@@ -736,6 +736,8 @@ class MeshViewer(QWidget):
         self.b5_file_name = ""  # 背景图片2的文件名
         self.b6_file_name = ""  # 背景图片2的文件名
         self.save_dir = ""  # 保存目录
+        self.obj_current_dir = ""
+        self.obj_name = None
         # 创建控制面板
         controlPanel = self.createControlPanel()
 
@@ -1097,7 +1099,13 @@ class MeshViewer(QWidget):
             'scale': scale
         }
         # 保存为JSON文件
-        filename, _ = QFileDialog.getSaveFileName(self, "保存参数文件", self.save_dir, "JSON Files (*.json)")
+        default_filename = f"init_{self.obj_name}.json" if hasattr(self, 'obj_name') else "init_params.json"
+        if self.b1_dir == self.b2_dir == self.b3_dir == self.b4_dir == self.b5_dir == self.b6_dir:
+            self.save_dir = os.path.dirname(self.b1_dir)  # 如果所有背景图片目录相同，则使用该目录
+            # self.save_dir = self.b1_dir
+        save_path = os.path.join(self.save_dir, default_filename) if self.save_dir else default_filename
+        # filename, _ = QFileDialog.getSaveFileName(self, "保存参数文件", self.save_dir, "JSON Files (*.json)")
+        filename, _ = QFileDialog.getSaveFileName(self, "保存参数文件", save_path,"JSON Files (*.json)")
         if filename:
             self.save_dir = os.path.dirname(filename)  # 更新保存目录
             with open(filename, 'w') as f:
@@ -1391,6 +1399,8 @@ class MeshViewer(QWidget):
 
         try:
             self.obj_current_dir = os.path.dirname(filename) 
+            obj_basename = os.path.basename(filename)
+            self.obj_name = os.path.splitext(obj_basename)[0]  # 移除扩展名
             # 使用PyTorch3D加载OBJ文件
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             verts, faces, aux = load_obj(
@@ -1620,7 +1630,8 @@ class MeshViewer(QWidget):
         self.glWidget1.set_background_image(new_image)
         
         # 更新文件名显示
-        short_name = os.path.basename(new_image)
+        # short_name = os.path.basename(new_image)
+        short_name = self.get_last_three_levels(new_image)  # 获取后三级文件名
         self.fileNameLabel1.setText(short_name)
         self.fileNameLabel1.setToolTip(new_image)
         
@@ -1696,7 +1707,8 @@ class MeshViewer(QWidget):
         self.glWidget2.set_background_image(new_image)
         
         # 更新文件名显示
-        short_name = os.path.basename(new_image)
+        # short_name = os.path.basename(new_image)
+        short_name = self.get_last_three_levels(new_image)  # 获取后三级文件名
         self.fileNameLabel2.setText(short_name)
         self.fileNameLabel2.setToolTip(new_image)
         
@@ -1771,7 +1783,8 @@ class MeshViewer(QWidget):
         self.glWidget3.set_background_image(new_image)
         
         # 更新文件名显示
-        short_name = os.path.basename(new_image)
+        # short_name = os.path.basename(new_image)
+        short_name = self.get_last_three_levels(new_image)  # 获取后三级文件名
         self.fileNameLabel3.setText(short_name)
         self.fileNameLabel3.setToolTip(new_image)
         
@@ -1846,7 +1859,8 @@ class MeshViewer(QWidget):
         self.glWidget4.set_background_image(new_image)
         
         # 更新文件名显示
-        short_name = os.path.basename(new_image)
+        # short_name = os.path.basename(new_image)
+        short_name = self.get_last_three_levels(new_image)  # 获取后三级文件名
         self.fileNameLabel4.setText(short_name)
         self.fileNameLabel4.setToolTip(new_image)
         
@@ -1921,7 +1935,8 @@ class MeshViewer(QWidget):
         self.glWidget5.set_background_image(new_image)
         
         # 更新文件名显示
-        short_name = os.path.basename(new_image)
+        # short_name = os.path.basename(new_image)
+        short_name = self.get_last_three_levels(new_image)  # 获取后三级文件名
         self.fileNameLabel5.setText(short_name)
         self.fileNameLabel5.setToolTip(new_image)
         
@@ -1996,13 +2011,30 @@ class MeshViewer(QWidget):
         self.glWidget6.set_background_image(new_image)
         
         # 更新文件名显示
-        short_name = os.path.basename(new_image)
+        # short_name = os.path.basename(new_image)
+        short_name = self.get_last_three_levels(new_image)  # 获取后三级文件名
         self.fileNameLabel6.setText(short_name)
         self.fileNameLabel6.setToolTip(new_image)
         
         # 更新当前目录
         self.b6_dir = os.path.dirname(new_image)
         self.b6_file_name = new_image  # 保存文件名
+    # 修改后 - 获取后三级文件名
+    def get_last_three_levels(self, filename):
+        # 规范化路径并分割
+        normalized = os.path.normpath(filename)
+        parts = normalized.split(os.sep)
+        
+        # 获取最后三级路径
+        if len(parts) >= 3:
+            # 取最后三个部分并连接
+            return os.path.join(*parts[-3:])
+        elif len(parts) > 0:
+            # 如果不足三级，返回整个路径
+            return os.path.join(*parts)
+        else:
+            # 空路径情况
+            return filename
     def loadBackgroundImage1(self):
         """加载背景图片"""
         filename, _ = QFileDialog.getOpenFileName(self, "Load Background Image 1", self.b1_dir, "Image Files (*.png *.jpg *.bmp)")
@@ -2015,7 +2047,8 @@ class MeshViewer(QWidget):
         self.glWidget1.set_background_image(filename)
 
         # 更新文件名显示
-        short_name = os.path.basename(filename)  # 只显示文件名，不显示完整路径
+        # short_name = os.path.basename(filename)  # 只显示文件名，不显示完整路径
+        short_name = self.get_last_three_levels(filename)  # 获取后三级文件名
         self.fileNameLabel1.setText(short_name)
         self.fileNameLabel1.setToolTip(filename)  # 完整路径作为提示  
 
@@ -2030,7 +2063,8 @@ class MeshViewer(QWidget):
         # 为每个 OpenGL 部件设置背景图片
         self.glWidget2.set_background_image(filename)
                 # 更新文件名显示
-        short_name = os.path.basename(filename)  # 只显示文件名，不显示完整路径
+        # short_name = os.path.basename(filename)  # 只显示文件名，不显示完整路径
+        short_name = self.get_last_three_levels(filename)  # 获取后三级文件名
         self.fileNameLabel2.setText(short_name)
         self.fileNameLabel2.setToolTip(filename)  # 完整路径作为提示  
 
@@ -2046,7 +2080,8 @@ class MeshViewer(QWidget):
         self.glWidget3.set_background_image(filename)
 
                 # 更新文件名显示
-        short_name = os.path.basename(filename)  # 只显示文件名，不显示完整路径
+        # short_name = os.path.basename(filename)  # 只显示文件名，不显示完整路径
+        short_name = self.get_last_three_levels(filename)  # 获取后三级文件名
         self.fileNameLabel3.setText(short_name)
         self.fileNameLabel3.setToolTip(filename)  # 完整路径作为提示  
 
@@ -2062,7 +2097,8 @@ class MeshViewer(QWidget):
         self.glWidget4.set_background_image(filename)
 
                 # 更新文件名显示
-        short_name = os.path.basename(filename)  # 只显示文件名，不显示完整路径
+        # short_name = os.path.basename(filename)  # 只显示文件名，不显示完整路径
+        short_name = self.get_last_three_levels(filename)  # 获取后三级文件名
         self.fileNameLabel4.setText(short_name)
         self.fileNameLabel4.setToolTip(filename)  # 完整路径作为提示  
 
@@ -2078,7 +2114,8 @@ class MeshViewer(QWidget):
         self.glWidget5.set_background_image(filename)
 
                 # 更新文件名显示
-        short_name = os.path.basename(filename)  # 只显示文件名，不显示完整路径
+        # short_name = os.path.basename(filename)  # 只显示文件名，不显示完整路径
+        short_name = self.get_last_three_levels(filename)  # 获取后三级文件名
         self.fileNameLabel5.setText(short_name)
         self.fileNameLabel5.setToolTip(filename)  # 完整路径作为提示  
     
@@ -2094,7 +2131,8 @@ class MeshViewer(QWidget):
         self.glWidget6.set_background_image(filename)
 
                 # 更新文件名显示
-        short_name = os.path.basename(filename)  # 只显示文件名，不显示完整路径
+        # short_name = os.path.basename(filename)  # 只显示文件名，不显示完整路径
+        short_name = self.get_last_three_levels(filename)  # 获取后三级文件名
         self.fileNameLabel6.setText(short_name)
         self.fileNameLabel6.setToolTip(filename)  # 完整路径作为提示  
 
